@@ -1,0 +1,124 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"unicode"
+)
+
+var st_line []rune
+var st_line_pos int
+
+type LexerStatus int
+
+const (
+	INITIAL_STATUS LexerStatus = iota
+	IN_INT_PART_STATUS
+	DOT_STATUS
+	IN_FRAC_PART_STATUS
+)
+
+func getToken(token *Token) {
+	var out_pos int = 0
+	var status LexerStatus = INITIAL_STATUS
+	var current_char rune
+	token.str = ""
+	token.kind = BAD_TOKEN
+	for {
+		if st_line[st_line_pos] == '\000' {
+			break
+		}
+		current_char = st_line[st_line_pos]
+		//fmt.Println("current_char---(", string(current_char), ")")
+		if (status == IN_INT_PART_STATUS || status == IN_FRAC_PART_STATUS) && !unicode.IsDigit(current_char) && current_char != '.' {
+			token.kind = NUMBER_TOKEN
+			value, _ := strconv.ParseFloat(token.str, 32)
+			token.value = float32(value)
+			//fmt.Println("current_char---(", token.str, ")")
+			return
+		}
+		if unicode.IsSpace(current_char) {
+			if current_char == '\n' {
+				token.kind = END_OF_LINE_TOKEN
+				return
+			}
+			st_line_pos++
+			continue
+		}
+		if out_pos >= MAX_TOKENSIZE-1 {
+			fmt.Println("token too long.")
+			os.Exit(1)
+		}
+
+		token.str += string(st_line[st_line_pos])
+		st_line_pos++
+		out_pos++
+
+		if current_char == '+' {
+			token.kind = ADD_OPERATOR_TOKEN
+			return
+		} else if current_char == '-' {
+			token.kind = SUB_OPERATOR_TOKEN
+			return
+		} else if current_char == '*' {
+			token.kind = MUL_OPERATOR_TOKEN
+			return
+		} else if current_char == '/' {
+			token.kind = DIV_OPERATOR_TOKEN
+			return
+		} else if unicode.IsDigit(current_char) {
+			if status == INITIAL_STATUS {
+				status = IN_INT_PART_STATUS
+			} else if status == DOT_STATUS {
+				status = IN_FRAC_PART_STATUS
+			}
+		} else if current_char == '.' {
+			if status == IN_INT_PART_STATUS {
+				status = DOT_STATUS
+			} else {
+				fmt.Println("syntax error.")
+				os.Exit(1)
+			}
+		} else if current_char == '(' {
+			token.kind = LEFT_PAREN_TOKEN
+			return
+		} else if current_char == ')' {
+			token.kind = RIGHT_PAREN_TOKEN
+			return
+		} else {
+			fmt.Println("bad character(", current_char, ")")
+			os.Exit(1)
+		}
+	}
+}
+
+func set_line(line []rune) {
+	st_line = line
+	st_line_pos = 0
+}
+
+// func parse_line(buf []rune) {
+// 	var token Token
+
+// 	set_line(buf)
+
+// 	for {
+// 		getToken(&token)
+// 		if token.kind == END_OF_LINE_TOKEN {
+// 			break
+// 		} else {
+// 			fmt.Println("kind...", token.kind, "str...", token.str)
+// 		}
+// 	}
+// }
+// func main() {
+// 	inputReader := bufio.NewReader(os.Stdin)
+// 	fmt.Println("please input:")
+// 	input, err := inputReader.ReadString('\n')
+// 	if err != nil {
+// 		fmt.Println("There ware errors reading,exiting program.")
+// 		return
+// 	}
+// 	parse_line([]rune(input))
+// }
