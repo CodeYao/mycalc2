@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 )
@@ -38,7 +39,50 @@ func parse_primary_expression() float32 {
 
 	my_get_token(&token)
 
-	/*获取变量，放入map,如果已存在，就返回value*/
+	//判断是否声明变量
+	if token.kind == STATE_TYPE_TOKEN {
+		state_token := token
+		my_get_token(&token)
+		//获取变量名，放入map
+		if token.kind == STATE_TOKEN {
+			if state_token.str == "let" {
+				token.stateType = LET
+			} else if state_token.str == "set" {
+				token.stateType = SET
+			}
+			stk := token
+			my_get_token(&token)
+			//获取变量类型
+			if token.kind == TOKEN_TYPE_TOKEN {
+				stk.tokenType = getTokenType(token.str)
+				if stk.tokenType == ERRORTYPE {
+					fmt.Println("error type : ", token.str)
+					os.Exit(1)
+				}
+				my_get_token(&token)
+				//变量后续是否为赋值操作
+				if token.kind == ASS_OPERATOR_TOKEN {
+					value = parse_expression()
+					if minus_flages == 1 {
+						value = -value
+					}
+					if _, ok := paramList[stk.str]; ok {
+						fmt.Println("error the variable is existed : ", stk.str)
+						os.Exit(1)
+					} else {
+						stk.value = value
+						paramList[stk.str] = stk
+					}
+				} else {
+					unget_token(&token)
+					paramList[stk.str] = stk
+					return value
+				}
+			}
+		}
+	}
+
+	/*获取变量，返回value*/
 	if token.kind == STATE_TOKEN {
 		stk := token //保存变量TOKEN
 		my_get_token(&token)
@@ -53,26 +97,26 @@ func parse_primary_expression() float32 {
 				paramList[stk.str] = tk
 				fmt.Println(tk.str, " :: ", tk.value)
 			} else {
-				stk.value = value
-				paramList[stk.str] = stk
+				fmt.Println("Cannot assign a variable to an undeclared variable : ", stk.str)
+				os.Exit(1)
 			}
 		} else {
 			unget_token(&token)
 			if t, ok := paramList[stk.str]; ok {
 				fmt.Println(t.str, " : ", t.value)
 				if minus_flages == 1 {
-					return -t.value
+					return -t.value.(float32)
 				}
-				return t.value
+				return t.value.(float32)
 			} else {
-				paramList[stk.str] = stk
-				return value
+				fmt.Println("Undeclared variables : ", stk.str)
+				os.Exit(1)
 			}
 		}
 	}
 
 	if token.kind == NUMBER_TOKEN {
-		value = token.value
+		value = token.value.(float32)
 	} else if token.kind == LEFT_PAREN_TOKEN {
 		value = parse_expression()
 		my_get_token(&token)
@@ -138,29 +182,62 @@ func parse_expression() float32 {
 	return v1
 }
 
-// func parse_line() float32 {
-// 	var value float32
+//获取变量类型
+func getTokenType(str string) TokenType {
+	if str == "int8" {
+		return INT8
+	} else if str == "int16" {
+		return INT16
+	} else if str == "int32" {
+		return INT32
+	} else if str == "int64" {
+		return INT64
+	} else if str == "uint8" {
+		return UINT8
+	} else if str == "uint16" {
+		return UINT16
+	} else if str == "uint32" {
+		return UINT32
+	} else if str == "uint64" {
+		return UINT64
+	} else if str == "bool" {
+		return BOOL
+	} else if str == "float32" {
+		return FLOAT32
+	} else if str == "float64" {
+		return FLOAT64
+	} else if str == "string" {
+		return STRING
+	} else if str == "char" {
+		return CHAR
+	} else {
+		return ERRORTYPE
+	}
+}
 
-// 	st_look_ahead_token_exists = 0
-// 	value = parse_expression()
+func parse_line() float32 {
+	var value float32
 
-// 	return value
-// }
+	st_look_ahead_token_exists = 0
+	value = parse_expression()
 
-// func main() {
-// 	var value float32
-// 	paramList = make(map[string]Token) //变量列表
-// 	for {
-// 		inputReader := bufio.NewReader(os.Stdin)
-// 		fmt.Println("please input:")
-// 		input, err := inputReader.ReadString('\n')
-// 		if err != nil {
-// 			fmt.Println("There ware errors reading,exiting program.")
-// 			return
-// 		}
-// 		set_line([]rune(input))
-// 		value = parse_line()
-// 		fmt.Println(">>", value)
-// 	}
+	return value
+}
 
-// }
+func main() {
+	var value float32
+	paramList = make(map[string]Token) //变量列表
+	for {
+		inputReader := bufio.NewReader(os.Stdin)
+		fmt.Println("please input:")
+		input, err := inputReader.ReadString('\n')
+		if err != nil {
+			fmt.Println("There ware errors reading,exiting program.")
+			return
+		}
+		set_line([]rune(input))
+		value = parse_line()
+		fmt.Println(">>", value)
+	}
+
+}

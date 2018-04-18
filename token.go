@@ -39,6 +39,7 @@ const (
 	FLOAT64
 	STRING
 	CHAR
+	ERRORTYPE
 )
 
 const (
@@ -51,7 +52,7 @@ var StatementWords = []string{"let", "set"}
 
 type Token struct {
 	kind      TokenKind
-	value     float32 //interface{}
+	value     interface{} //float32
 	str       string
 	tokenType TokenType
 	stateType StateType

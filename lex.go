@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -149,27 +148,27 @@ func IsStatement(str string) bool {
 	return false
 }
 
-func parse_line(buf []rune) {
-	var token Token
+// func parse_line(buf []rune) {
+// 	var token Token
 
-	set_line(buf)
+// 	set_line(buf)
 
-	for {
-		getToken(&token)
-		if token.kind == END_OF_LINE_TOKEN {
-			break
-		} else {
-			fmt.Println("kind...", token.kind, "str...", token.str)
-		}
-	}
-}
-func main() {
-	inputReader := bufio.NewReader(os.Stdin)
-	fmt.Println("please input:")
-	input, err := inputReader.ReadString('\n')
-	if err != nil {
-		fmt.Println("There ware errors reading,exiting program.")
-		return
-	}
-	parse_line([]rune(input))
-}
+// 	for {
+// 		getToken(&token)
+// 		if token.kind == END_OF_LINE_TOKEN {
+// 			break
+// 		} else {
+// 			fmt.Println("kind...", token.kind, "str...", token.str)
+// 		}
+// 	}
+// }
+// func main() {
+// 	inputReader := bufio.NewReader(os.Stdin)
+// 	fmt.Println("please input:")
+// 	input, err := inputReader.ReadString('\n')
+// 	if err != nil {
+// 		fmt.Println("There ware errors reading,exiting program.")
+// 		return
+// 	}
+// 	parse_line([]rune(input))
+// }
