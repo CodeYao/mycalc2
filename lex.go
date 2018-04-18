@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -43,8 +44,14 @@ func getToken(token *Token) {
 		}
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
-			token.kind = STATE_TOKEN
-			//fmt.Println("current_char---(", token.str, ")")
+			fmt.Println("current_char---(", token.str, ")")
+			if IsKeyWord(token.str) {
+				token.kind = TOKEN_TYPE_TOKEN
+			} else if IsStatement(token.str) {
+				token.kind = STATE_TYPE_TOKEN
+			} else {
+				token.kind = STATE_TOKEN
+			}
 			return
 		}
 
@@ -124,27 +131,45 @@ func set_line(line []rune) {
 	st_line_pos = 0
 }
 
-// func parse_line(buf []rune) {
-// 	var token Token
+func IsKeyWord(str string) bool {
+	for _, keyword := range KeyWords {
+		if keyword == str {
+			return true
+		}
+	}
+	return false
+}
 
-// 	set_line(buf)
+func IsStatement(str string) bool {
+	for _, statementword := range StatementWords {
+		if statementword == str {
+			return true
+		}
+	}
+	return false
+}
 
-// 	for {
-// 		getToken(&token)
-// 		if token.kind == END_OF_LINE_TOKEN {
-// 			break
-// 		} else {
-// 			fmt.Println("kind...", token.kind, "str...", token.str)
-// 		}
-// 	}
-// }
-// func main() {
-// 	inputReader := bufio.NewReader(os.Stdin)
-// 	fmt.Println("please input:")
-// 	input, err := inputReader.ReadString('\n')
-// 	if err != nil {
-// 		fmt.Println("There ware errors reading,exiting program.")
-// 		return
-// 	}
-// 	parse_line([]rune(input))
-// }
+func parse_line(buf []rune) {
+	var token Token
+
+	set_line(buf)
+
+	for {
+		getToken(&token)
+		if token.kind == END_OF_LINE_TOKEN {
+			break
+		} else {
+			fmt.Println("kind...", token.kind, "str...", token.str)
+		}
+	}
+}
+func main() {
+	inputReader := bufio.NewReader(os.Stdin)
+	fmt.Println("please input:")
+	input, err := inputReader.ReadString('\n')
+	if err != nil {
+		fmt.Println("There ware errors reading,exiting program.")
+		return
+	}
+	parse_line([]rune(input))
+}

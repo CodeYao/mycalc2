@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 )
@@ -139,29 +138,29 @@ func parse_expression() float32 {
 	return v1
 }
 
-func parse_line() float32 {
-	var value float32
+// func parse_line() float32 {
+// 	var value float32
 
-	st_look_ahead_token_exists = 0
-	value = parse_expression()
+// 	st_look_ahead_token_exists = 0
+// 	value = parse_expression()
 
-	return value
-}
+// 	return value
+// }
 
-func main() {
-	var value float32
-	paramList = make(map[string]Token) //变量列表
-	for {
-		inputReader := bufio.NewReader(os.Stdin)
-		fmt.Println("please input:")
-		input, err := inputReader.ReadString('\n')
-		if err != nil {
-			fmt.Println("There ware errors reading,exiting program.")
-			return
-		}
-		set_line([]rune(input))
-		value = parse_line()
-		fmt.Println(">>", value)
-	}
+// func main() {
+// 	var value float32
+// 	paramList = make(map[string]Token) //变量列表
+// 	for {
+// 		inputReader := bufio.NewReader(os.Stdin)
+// 		fmt.Println("please input:")
+// 		input, err := inputReader.ReadString('\n')
+// 		if err != nil {
+// 			fmt.Println("There ware errors reading,exiting program.")
+// 			return
+// 		}
+// 		set_line([]rune(input))
+// 		value = parse_line()
+// 		fmt.Println(">>", value)
+// 	}
 
-}
+// }
