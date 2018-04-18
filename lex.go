@@ -17,6 +17,9 @@ const (
 	IN_INT_PART_STATUS
 	DOT_STATUS
 	IN_FRAC_PART_STATUS
+
+	FIRST_PARAM_STATUS
+	FOLLOW_PARAM_STATUS
 )
 
 func getToken(token *Token) {
@@ -38,6 +41,13 @@ func getToken(token *Token) {
 			//fmt.Println("current_char---(", token.str, ")")
 			return
 		}
+
+		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
+			token.kind = STATE_TOKEN
+			//fmt.Println("current_char---(", token.str, ")")
+			return
+		}
+
 		if unicode.IsSpace(current_char) {
 			if current_char == '\n' {
 				token.kind = END_OF_LINE_TOKEN
@@ -67,17 +77,33 @@ func getToken(token *Token) {
 		} else if current_char == '/' {
 			token.kind = DIV_OPERATOR_TOKEN
 			return
+		} else if current_char == '=' {
+			token.kind = ASS_OPERATOR_TOKEN
+			return
 		} else if unicode.IsDigit(current_char) {
 			if status == INITIAL_STATUS {
 				status = IN_INT_PART_STATUS
 			} else if status == DOT_STATUS {
 				status = IN_FRAC_PART_STATUS
+			} else if status == FIRST_PARAM_STATUS {
+				status = FOLLOW_PARAM_STATUS
 			}
 		} else if current_char == '.' {
 			if status == IN_INT_PART_STATUS {
 				status = DOT_STATUS
 			} else {
 				fmt.Println("syntax error.")
+				os.Exit(1)
+			}
+		} else if unicode.IsLetter(current_char) {
+			if status == INITIAL_STATUS {
+				status = FIRST_PARAM_STATUS
+			}
+		} else if current_char == '_' {
+			if status == FIRST_PARAM_STATUS {
+				status = FOLLOW_PARAM_STATUS
+			} else {
+				fmt.Println("error! a variable must begin with an alphabet")
 				os.Exit(1)
 			}
 		} else if current_char == '(' {

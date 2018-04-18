@@ -9,6 +9,8 @@ import (
 var st_look_ahead_token Token
 var st_look_ahead_token_exists int
 
+var paramList map[string]Token //变量列表
+
 func my_get_token(token *Token) {
 	if st_look_ahead_token_exists == 1 {
 		*token = st_look_ahead_token
@@ -36,13 +38,42 @@ func parse_primary_expression() float32 {
 	}
 
 	my_get_token(&token)
-	if token.kind == NUMBER_TOKEN {
-		if minus_flages == 1 {
-			return -token.value
+
+	/*获取变量，放入map,如果已存在，就返回value*/
+	if token.kind == STATE_TOKEN {
+		stk := token //保存变量TOKEN
+		my_get_token(&token)
+		//变量后续是否为赋值操作
+		if token.kind == ASS_OPERATOR_TOKEN {
+			value = parse_expression()
+			if minus_flages == 1 {
+				value = -value
+			}
+			if tk, ok := paramList[stk.str]; ok {
+				tk.value = value
+				paramList[stk.str] = tk
+				fmt.Println(tk.str, " :: ", tk.value)
+			} else {
+				stk.value = value
+				paramList[stk.str] = stk
+			}
 		} else {
-			fmt.Println("token.value...", token.value)
-			return token.value
+			unget_token(&token)
+			if t, ok := paramList[stk.str]; ok {
+				fmt.Println(t.str, " : ", t.value)
+				if minus_flages == 1 {
+					return -t.value
+				}
+				return t.value
+			} else {
+				paramList[stk.str] = stk
+				return value
+			}
 		}
+	}
+
+	if token.kind == NUMBER_TOKEN {
+		value = token.value
 	} else if token.kind == LEFT_PAREN_TOKEN {
 		value = parse_expression()
 		my_get_token(&token)
@@ -50,15 +81,14 @@ func parse_primary_expression() float32 {
 			fmt.Println("missing ')' error.")
 			os.Exit(1)
 		}
-		if minus_flages == 1 {
-			return -value
-		} else {
-			return value
-		}
+
+	} else {
+		unget_token(&token)
 	}
-	fmt.Println("syntax error.")
-	os.Exit(1)
-	return 0.0 /* make compiler happy */
+	if minus_flages == 1 {
+		value = -value
+	}
+	return value
 }
 
 func parse_term() float32 {
@@ -81,7 +111,7 @@ func parse_term() float32 {
 			v1 /= v2
 		}
 	}
-	fmt.Println("v1...", v1)
+	//fmt.Println("v1...", v1)
 	return v1
 }
 
@@ -120,15 +150,18 @@ func parse_line() float32 {
 
 func main() {
 	var value float32
-
-	inputReader := bufio.NewReader(os.Stdin)
-	fmt.Println("please input:")
-	input, err := inputReader.ReadString('\n')
-	if err != nil {
-		fmt.Println("There ware errors reading,exiting program.")
-		return
+	paramList = make(map[string]Token) //变量列表
+	for {
+		inputReader := bufio.NewReader(os.Stdin)
+		fmt.Println("please input:")
+		input, err := inputReader.ReadString('\n')
+		if err != nil {
+			fmt.Println("There ware errors reading,exiting program.")
+			return
+		}
+		set_line([]rune(input))
+		value = parse_line()
+		fmt.Println(">>", value)
 	}
-	set_line([]rune(input))
-	value = parse_line()
-	fmt.Println(">>", value)
+
 }
