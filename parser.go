@@ -97,8 +97,8 @@ func parse_primary_expression() interface{} {
 			//变量后续是否为赋值操作
 			if token.kind == ASS_OPERATOR_TOKEN {
 				value = parse_expression()
-				value = getValue(tk.tokenType, value, minus_flages)
-				tk.value = value
+				//value = getValue(tk.tokenType, value, minus_flages)
+				tk.value = getValue(tk.tokenType, value, minus_flages)
 				paramList[tk.str] = tk
 				fmt.Println(tk.str, " :: ", tk.value)
 			} else {
@@ -106,10 +106,10 @@ func parse_primary_expression() interface{} {
 				if t, ok := paramList[tk.str]; ok {
 					fmt.Println(t.str, " : ", t.value)
 					//遗留问题
-					if minus_flages == 1 {
-						return getValue(t.tokenType, value, minus_flages)
-					}
-					return t.value
+					// if minus_flages == 1 {
+					// 	return getValue(t.tokenType, value, minus_flages)
+					// }
+					value = t.value
 				} else {
 					fmt.Println("Undeclared variables : ", tk.str)
 					os.Exit(1)
@@ -123,8 +123,7 @@ func parse_primary_expression() interface{} {
 
 	//如果是常量
 	if token.kind == NUMBER_TOKEN {
-		//fmt.Println("token.tokenType : ", token.tokenType)
-		value = getValue(FLOAT64, token.value, minus_flages)
+		value = token.value
 	} else if token.kind == LEFT_PAREN_TOKEN {
 		value = parse_expression()
 		my_get_token(&token)
@@ -135,6 +134,21 @@ func parse_primary_expression() interface{} {
 
 	} else {
 		unget_token(&token)
+	}
+
+	if reflect.TypeOf(value).String() == "float32" || reflect.TypeOf(value).String() == "float64" {
+		value = reflect.ValueOf(value).Float()
+		if minus_flages == 1 {
+			value = -reflect.ValueOf(value).Float()
+		}
+	} else if reflect.TypeOf(value).String() == "int8" || reflect.TypeOf(value).String() == "int16" || reflect.TypeOf(value).String() == "int32" || reflect.TypeOf(value).String() == "int64" {
+		value = reflect.ValueOf(value).Int()
+		if minus_flages == 1 {
+			value = -reflect.ValueOf(value).Int()
+		}
+		value = float64(value.(int64))
+	} else {
+		fmt.Println("These Type can not be - ", reflect.TypeOf(value).String())
 	}
 
 	return value
@@ -153,13 +167,29 @@ func parse_term() interface{} {
 			break
 		}
 		v2 = parse_primary_expression()
-		fmt.Println("kind...", token.kind, "str...", token.str)
-		if token.kind == MUL_OPERATOR_TOKEN {
-			//v1 = v1.(float64) * v2.(float64)
-			fmt.Println("..........", reflect.TypeOf(v1).String(), "..........", reflect.TypeOf(v2).String())
-		} else if token.kind == DIV_OPERATOR_TOKEN {
-			//v1 = v1.(float64) / v2.(float64)
-			fmt.Println("..........", reflect.TypeOf(v1).String(), "..........", reflect.TypeOf(v2).String())
+
+		if reflect.TypeOf(v1).String() == reflect.TypeOf(v2).String() {
+			if token.kind == MUL_OPERATOR_TOKEN {
+				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+					v1 = reflect.ValueOf(v1).Float() * reflect.ValueOf(v2).Float()
+				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+					v1 = reflect.ValueOf(v1).Int() * reflect.ValueOf(v2).Int()
+				} else {
+					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+				}
+			} else if token.kind == DIV_OPERATOR_TOKEN {
+				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+					v1 = reflect.ValueOf(v1).Float() / reflect.ValueOf(v2).Float()
+				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+					v1 = reflect.ValueOf(v1).Int() / reflect.ValueOf(v2).Int()
+				} else {
+					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+				}
+			} else {
+				unget_token(&token)
+			}
+		} else {
+			fmt.Println("Type inconsistency ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 		}
 	}
 	//fmt.Println("v1...", v1)
@@ -181,6 +211,7 @@ func parse_expression() interface{} {
 		v2 = parse_term()
 		if reflect.TypeOf(v1).String() == reflect.TypeOf(v2).String() {
 			if token.kind == ADD_OPERATOR_TOKEN {
+				fmt.Println("======", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() + reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
