@@ -147,6 +147,12 @@ func parse_primary_expression() interface{} {
 			value = -reflect.ValueOf(value).Int()
 		}
 		value = float64(value.(int64))
+	} else if reflect.TypeOf(value).String() == "uint8" || reflect.TypeOf(value).String() == "uint16" || reflect.TypeOf(value).String() == "uint32" || reflect.TypeOf(value).String() == "uint64" {
+		value = reflect.ValueOf(value).Uint()
+		if minus_flages == 1 {
+			value = -reflect.ValueOf(value).Uint()
+		}
+		value = float64(value.(uint64))
 	} else {
 		fmt.Println("These Type can not be - ", reflect.TypeOf(value).String())
 	}
@@ -174,6 +180,8 @@ func parse_term() interface{} {
 					v1 = reflect.ValueOf(v1).Float() * reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
 					v1 = reflect.ValueOf(v1).Int() * reflect.ValueOf(v2).Int()
+				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+					v1 = reflect.ValueOf(v1).Uint() * reflect.ValueOf(v2).Uint()
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -182,6 +190,8 @@ func parse_term() interface{} {
 					v1 = reflect.ValueOf(v1).Float() / reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
 					v1 = reflect.ValueOf(v1).Int() / reflect.ValueOf(v2).Int()
+				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+					v1 = reflect.ValueOf(v1).Uint() / reflect.ValueOf(v2).Uint()
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -216,6 +226,8 @@ func parse_expression() interface{} {
 					v1 = reflect.ValueOf(v1).Float() + reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
 					v1 = reflect.ValueOf(v1).Int() + reflect.ValueOf(v2).Int()
+				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+					v1 = reflect.ValueOf(v1).Uint() + reflect.ValueOf(v2).Uint()
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -224,6 +236,8 @@ func parse_expression() interface{} {
 					v1 = reflect.ValueOf(v1).Float() - reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
 					v1 = reflect.ValueOf(v1).Int() - reflect.ValueOf(v2).Int()
+				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+					v1 = reflect.ValueOf(v1).Uint() - reflect.ValueOf(v2).Uint()
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -284,6 +298,18 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 		} else {
 			value = int16(value.(float64))
 		}
+	} else if t == INT32 {
+		if minus_flages == 1 {
+			value = -int32(value.(float64))
+		} else {
+			value = int32(value.(float64))
+		}
+	} else if t == INT64 {
+		if minus_flages == 1 {
+			value = -int64(value.(float64))
+		} else {
+			value = int64(value.(float64))
+		}
 	} else if t == FLOAT32 {
 		if minus_flages == 1 {
 			value = -float32(value.(float64))
@@ -295,6 +321,30 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 			value = -value.(float64)
 		} else {
 			value = value.(float64)
+		}
+	} else if t == UINT8 {
+		if minus_flages == 1 {
+			value = uint8(-value.(float64))
+		} else {
+			value = uint8(value.(float64))
+		}
+	} else if t == UINT16 {
+		if minus_flages == 1 {
+			value = uint16(-value.(float64))
+		} else {
+			value = uint16(value.(float64))
+		}
+	} else if t == UINT32 {
+		if minus_flages == 1 {
+			value = uint32(-value.(float64))
+		} else {
+			value = uint32(value.(float64))
+		}
+	} else if t == UINT64 {
+		if minus_flages == 1 {
+			value = uint64(-value.(float64))
+		} else {
+			value = uint64(value.(float64))
 		}
 	}
 	return value
