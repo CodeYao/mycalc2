@@ -25,9 +25,9 @@ func unget_token(token *Token) {
 	st_look_ahead_token_exists = 1
 }
 
-func parse_primary_expression() float32 {
+func parse_primary_expression() interface{} {
 	var token Token
-	var value float32 = 0.0
+	var value interface{} = 0
 	var minus_flages int = 0
 
 	my_get_token(&token)
@@ -59,13 +59,20 @@ func parse_primary_expression() float32 {
 					fmt.Println("error type : ", token.str)
 					os.Exit(1)
 				}
+
 				my_get_token(&token)
+
 				//变量后续是否为赋值操作
 				if token.kind == ASS_OPERATOR_TOKEN {
 					value = parse_expression()
-					if minus_flages == 1 {
-						value = -value
-					}
+					// tokentype := getTokenType(reflect.TypeOf(value).String())
+					// if stk.tokenType != tokentype {
+					// 	fmt.Println("The type of variable assignment is not consistent : ", token.str)
+					// 	os.Exit(1)
+					// }
+
+					value = getValue(stk.tokenType, value, minus_flages)
+
 					if _, ok := paramList[stk.str]; ok {
 						fmt.Println("error the variable is existed : ", stk.str)
 						os.Exit(1)
@@ -84,39 +91,39 @@ func parse_primary_expression() float32 {
 
 	/*获取变量，返回value*/
 	if token.kind == STATE_TOKEN {
-		stk := token //保存变量TOKEN
-		my_get_token(&token)
-		//变量后续是否为赋值操作
-		if token.kind == ASS_OPERATOR_TOKEN {
-			value = parse_expression()
-			if minus_flages == 1 {
-				value = -value
-			}
-			if tk, ok := paramList[stk.str]; ok {
+		//判断是否已经声明
+		if tk, ok := paramList[token.str]; ok {
+			my_get_token(&token)
+			//变量后续是否为赋值操作
+			if token.kind == ASS_OPERATOR_TOKEN {
+				value = parse_expression()
+				value = getValue(tk.tokenType, value, minus_flages)
 				tk.value = value
-				paramList[stk.str] = tk
+				paramList[tk.str] = tk
 				fmt.Println(tk.str, " :: ", tk.value)
 			} else {
-				fmt.Println("Cannot assign a variable to an undeclared variable : ", stk.str)
-				os.Exit(1)
+				unget_token(&token)
+				if t, ok := paramList[tk.str]; ok {
+					fmt.Println(t.str, " : ", t.value)
+					//遗留问题
+					if minus_flages == 1 {
+						return -t.value.(float32)
+					}
+					return t.value
+				} else {
+					fmt.Println("Undeclared variables : ", tk.str)
+					os.Exit(1)
+				}
 			}
 		} else {
-			unget_token(&token)
-			if t, ok := paramList[stk.str]; ok {
-				fmt.Println(t.str, " : ", t.value)
-				if minus_flages == 1 {
-					return -t.value.(float32)
-				}
-				return t.value.(float32)
-			} else {
-				fmt.Println("Undeclared variables : ", stk.str)
-				os.Exit(1)
-			}
+			fmt.Println("an undeclared variable : ", tk.str)
+			os.Exit(1)
 		}
 	}
 
+	//如果是常量
 	if token.kind == NUMBER_TOKEN {
-		value = token.value.(float32)
+		value = token.value.(float64)
 	} else if token.kind == LEFT_PAREN_TOKEN {
 		value = parse_expression()
 		my_get_token(&token)
@@ -128,15 +135,16 @@ func parse_primary_expression() float32 {
 	} else {
 		unget_token(&token)
 	}
+	//遗留问题
 	if minus_flages == 1 {
-		value = -value
+		value = -value.(float32)
 	}
 	return value
 }
 
-func parse_term() float32 {
-	var v1 float32
-	var v2 float32
+func parse_term() interface{} {
+	var v1 interface{}
+	var v2 interface{}
 	var token Token
 
 	v1 = parse_primary_expression()
@@ -149,18 +157,18 @@ func parse_term() float32 {
 		v2 = parse_primary_expression()
 		fmt.Println("kind...", token.kind, "str...", token.str)
 		if token.kind == MUL_OPERATOR_TOKEN {
-			v1 *= v2
+			v1 = v1.(float64) * v2.(float64)
 		} else if token.kind == DIV_OPERATOR_TOKEN {
-			v1 /= v2
+			v1 = v1.(float64) / v2.(float64)
 		}
 	}
 	//fmt.Println("v1...", v1)
 	return v1
 }
 
-func parse_expression() float32 {
-	var v1 float32
-	var v2 float32
+func parse_expression() float64 {
+	var v1 interface{}
+	var v2 interface{}
 	var token Token
 
 	v1 = parse_term()
@@ -172,14 +180,14 @@ func parse_expression() float32 {
 		}
 		v2 = parse_term()
 		if token.kind == ADD_OPERATOR_TOKEN {
-			v1 += v2
+			v1 = v1.(float64) + v2.(float64)
 		} else if token.kind == SUB_OPERATOR_TOKEN {
-			v1 -= v2
+			v1 = v1.(float64) - v2.(float64)
 		} else {
 			unget_token(&token)
 		}
 	}
-	return v1
+	return v1.(float64)
 }
 
 //获取变量类型
@@ -208,15 +216,45 @@ func getTokenType(str string) TokenType {
 		return FLOAT64
 	} else if str == "string" {
 		return STRING
-	} else if str == "char" {
+	} else if str == "rune" {
 		return CHAR
 	} else {
 		return ERRORTYPE
 	}
 }
 
-func parse_line() float32 {
-	var value float32
+//获取value类型
+func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
+	if t == INT8 {
+		if minus_flages == 1 {
+			value = -value.(int8)
+		} else {
+			value = value.(int8)
+		}
+	} else if t == INT16 {
+		if minus_flages == 1 {
+			value = -value.(int16)
+		} else {
+			value = value.(int16)
+		}
+	} else if t == FLOAT32 {
+		if minus_flages == 1 {
+			value = -value.(float32)
+		} else {
+			value = value.(float32)
+		}
+	} else if t == FLOAT64 {
+		if minus_flages == 1 {
+			value = -value.(float64)
+		} else {
+			value = value.(float64)
+		}
+	}
+	return value
+}
+
+func parse_line() float64 {
+	var value float64
 
 	st_look_ahead_token_exists = 0
 	value = parse_expression()
@@ -225,7 +263,7 @@ func parse_line() float32 {
 }
 
 func main() {
-	var value float32
+	var value float64
 	paramList = make(map[string]Token) //变量列表
 	for {
 		inputReader := bufio.NewReader(os.Stdin)

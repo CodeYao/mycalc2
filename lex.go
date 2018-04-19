@@ -36,8 +36,13 @@ func getToken(token *Token) {
 		//fmt.Println("current_char---(", string(current_char), ")")
 		if (status == IN_INT_PART_STATUS || status == IN_FRAC_PART_STATUS) && !unicode.IsDigit(current_char) && current_char != '.' {
 			token.kind = NUMBER_TOKEN
-			value, _ := strconv.ParseFloat(token.str, 32)
-			token.value = float32(value)
+			if status == IN_INT_PART_STATUS {
+				value, _ := strconv.ParseInt(token.str, 10, 64)
+				token.value = int64(value)
+			} else if status == IN_FRAC_PART_STATUS {
+				value, _ := strconv.ParseFloat(token.str, 64)
+				token.value = float64(value)
+			}
 			//fmt.Println("current_char---(", token.str, ")")
 			return
 		}
