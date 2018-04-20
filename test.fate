@@ -1,0 +1,3 @@
+let a int8 = 9
+let b int8 = 10
+a+b

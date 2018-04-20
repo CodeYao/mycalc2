@@ -49,11 +49,13 @@ func getToken(token *Token) {
 		}
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
-			fmt.Println("current_char---(", token.str, ")")
+			fmt.Println("current_str---(", token.str, ")")
 			if IsKeyWord(token.str) {
 				token.kind = TOKEN_TYPE_TOKEN
 			} else if IsStatement(token.str) {
 				token.kind = STATE_TYPE_TOKEN
+			} else if IsBool(token.str) {
+				token.kind = BOOL_TOKEN
 			} else {
 				token.kind = STATE_TOKEN
 			}
@@ -61,12 +63,15 @@ func getToken(token *Token) {
 		}
 
 		if unicode.IsSpace(current_char) {
+			fmt.Println("current_char-------(", string(current_char), ")")
 			if current_char == '\n' {
 				token.kind = END_OF_LINE_TOKEN
 				return
 			}
-			st_line_pos++
-			continue
+			if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
+				st_line_pos++
+				continue
+			}
 		}
 		if out_pos >= MAX_TOKENSIZE-1 {
 			fmt.Println("token too long.")
@@ -76,58 +81,75 @@ func getToken(token *Token) {
 		token.str += string(st_line[st_line_pos])
 		st_line_pos++
 		out_pos++
-
-		if current_char == '+' {
-			token.kind = ADD_OPERATOR_TOKEN
-			return
-		} else if current_char == '-' {
-			token.kind = SUB_OPERATOR_TOKEN
-			return
-		} else if current_char == '*' {
-			token.kind = MUL_OPERATOR_TOKEN
-			return
-		} else if current_char == '/' {
-			token.kind = DIV_OPERATOR_TOKEN
-			return
-		} else if current_char == '=' {
-			token.kind = ASS_OPERATOR_TOKEN
-			return
-		} else if unicode.IsDigit(current_char) {
-			if status == INITIAL_STATUS {
-				status = IN_INT_PART_STATUS
-			} else if status == DOT_STATUS {
-				status = IN_FRAC_PART_STATUS
-			} else if status == FIRST_PARAM_STATUS {
-				status = FOLLOW_PARAM_STATUS
-			}
-		} else if current_char == '.' {
-			if status == IN_INT_PART_STATUS {
-				status = DOT_STATUS
+		if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
+			if current_char == '+' {
+				token.kind = ADD_OPERATOR_TOKEN
+				return
+			} else if current_char == '-' {
+				token.kind = SUB_OPERATOR_TOKEN
+				return
+			} else if current_char == '*' {
+				token.kind = MUL_OPERATOR_TOKEN
+				return
+			} else if current_char == '/' {
+				token.kind = DIV_OPERATOR_TOKEN
+				return
+			} else if current_char == '=' {
+				token.kind = ASS_OPERATOR_TOKEN
+				return
+			} else if unicode.IsDigit(current_char) {
+				if status == INITIAL_STATUS {
+					status = IN_INT_PART_STATUS
+				} else if status == DOT_STATUS {
+					status = IN_FRAC_PART_STATUS
+				} else if status == FIRST_PARAM_STATUS {
+					status = FOLLOW_PARAM_STATUS
+				}
+			} else if current_char == '.' {
+				if status == IN_INT_PART_STATUS {
+					status = DOT_STATUS
+				} else {
+					fmt.Println("syntax error.")
+					os.Exit(1)
+				}
+			} else if current_char == '\'' {
+				token.kind = CHAR_SIGN_TOKEN
+				status = CHAR_PART_STATUS
+			} else if current_char == '"' {
+				token.kind = STRING_SIGN_TOKEN
+				status = STRING_PART_STATUS
+			} else if unicode.IsLetter(current_char) {
+				if status == INITIAL_STATUS {
+					status = FIRST_PARAM_STATUS
+				}
+			} else if current_char == '_' {
+				if status == FIRST_PARAM_STATUS {
+					status = FOLLOW_PARAM_STATUS
+				} else {
+					fmt.Println("error! a variable must begin with an alphabet")
+					os.Exit(1)
+				}
+			} else if current_char == '(' {
+				token.kind = LEFT_PAREN_TOKEN
+				return
+			} else if current_char == ')' {
+				token.kind = RIGHT_PAREN_TOKEN
+				return
 			} else {
-				fmt.Println("syntax error.")
+				fmt.Println("bad character(", current_char, ")")
 				os.Exit(1)
 			}
-		} else if unicode.IsLetter(current_char) {
-			if status == INITIAL_STATUS {
-				status = FIRST_PARAM_STATUS
+		} else if status == CHAR_PART_STATUS || status == STRING_PART_STATUS {
+			if current_char == '\'' {
+				token.kind = CHAR_TOKEN
+				return
+			} else if current_char == '"' {
+				token.kind = STRING_TOKEN
+				return
 			}
-		} else if current_char == '_' {
-			if status == FIRST_PARAM_STATUS {
-				status = FOLLOW_PARAM_STATUS
-			} else {
-				fmt.Println("error! a variable must begin with an alphabet")
-				os.Exit(1)
-			}
-		} else if current_char == '(' {
-			token.kind = LEFT_PAREN_TOKEN
-			return
-		} else if current_char == ')' {
-			token.kind = RIGHT_PAREN_TOKEN
-			return
-		} else {
-			fmt.Println("bad character(", current_char, ")")
-			os.Exit(1)
+			//fmt.Println("----current_char---(", token.str, ")")
 		}
+
 	}
 }
 
@@ -152,6 +174,15 @@ func IsStatement(str string) bool {
 		}
 	}
 	return false
+}
+
+func IsBool(str string) bool {
+	if str == "true" || str == "true" {
+		return true
+	} else {
+		return false
+	}
+
 }
 
 // func parse_line(buf []rune) {

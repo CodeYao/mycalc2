@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 )
@@ -131,7 +132,16 @@ func parse_primary_expression() interface{} {
 			fmt.Println("missing ')' error.")
 			os.Exit(1)
 		}
+	} else if token.kind == CHAR_TOKEN || token.kind == STRING_TOKEN {
+		value = string([]rune(token.str)[1 : len(token.str)-1])
+		fmt.Println(token.str, " ----------- ", value.(string))
 
+	} else if token.kind == BOOL_TOKEN {
+		if token.str == "true" {
+			value = true
+		} else if token.str == "false" {
+			value = false
+		}
 	} else {
 		unget_token(&token)
 	}
@@ -153,9 +163,9 @@ func parse_primary_expression() interface{} {
 			value = -reflect.ValueOf(value).Uint()
 		}
 		value = float64(value.(uint64))
-	} else {
-		fmt.Println("These Type can not be - ", reflect.TypeOf(value).String())
-	}
+	} // else {
+	// 	fmt.Println("These Type can not be negative ", reflect.TypeOf(value).String())
+	// }
 
 	return value
 }
@@ -182,6 +192,8 @@ func parse_term() interface{} {
 					v1 = reflect.ValueOf(v1).Int() * reflect.ValueOf(v2).Int()
 				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
 					v1 = reflect.ValueOf(v1).Uint() * reflect.ValueOf(v2).Uint()
+				} else if reflect.TypeOf(v1).String() == "rune" {
+					v1 = v1.(rune) * v2.(rune)
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -192,6 +204,8 @@ func parse_term() interface{} {
 					v1 = reflect.ValueOf(v1).Int() / reflect.ValueOf(v2).Int()
 				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
 					v1 = reflect.ValueOf(v1).Uint() / reflect.ValueOf(v2).Uint()
+				} else if reflect.TypeOf(v1).String() == "rune" {
+					v1 = v1.(rune) / v2.(rune)
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -228,6 +242,10 @@ func parse_expression() interface{} {
 					v1 = reflect.ValueOf(v1).Int() + reflect.ValueOf(v2).Int()
 				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
 					v1 = reflect.ValueOf(v1).Uint() + reflect.ValueOf(v2).Uint()
+				} else if reflect.TypeOf(v1).String() == "rune" {
+					v1 = v1.(rune) + v2.(rune)
+				} else if reflect.TypeOf(v1).String() == "string" {
+					v1 = v1.(string) + v2.(string)
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -238,6 +256,8 @@ func parse_expression() interface{} {
 					v1 = reflect.ValueOf(v1).Int() - reflect.ValueOf(v2).Int()
 				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
 					v1 = reflect.ValueOf(v1).Uint() - reflect.ValueOf(v2).Uint()
+				} else if reflect.TypeOf(v1).String() == "rune" {
+					v1 = v1.(rune) - v2.(rune)
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
@@ -346,6 +366,14 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 		} else {
 			value = uint64(value.(float64))
 		}
+	} else if t == CHAR {
+		r1 := []rune(value.(string))
+		//暂时没有实现转义字符
+		value = r1[0]
+	} else if t == STRING {
+		value = value.(string)
+	} else if t == BOOL {
+		value = value.(bool)
 	}
 	return value
 }
@@ -362,15 +390,35 @@ func parse_line() interface{} {
 func main() {
 	var value interface{}
 	paramList = make(map[string]Token) //变量列表
+	// for {
+	// 	inputReader := bufio.NewReader(os.Stdin)
+	// 	fmt.Println("please input:")
+	// 	input, err := inputReader.ReadString('\n')
+	// 	if err != nil {
+	// 		fmt.Println("There ware errors reading,exiting program.")
+	// 		return
+	// 	}
+	// 	set_line([]rune(input))
+	// 	value = parse_line()
+	// 	fmt.Println(">>", reflect.ValueOf(value))
+	// }
+	fi, err := os.Open("D:\\0_chenyao\\git\\src\\fate\\mycalc2\\test.fate")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return
+	}
+	defer fi.Close()
+	inputReader := bufio.NewReader(fi)
 	for {
-		inputReader := bufio.NewReader(os.Stdin)
-		fmt.Println("please input:")
-		input, err := inputReader.ReadString('\n')
-		if err != nil {
-			fmt.Println("There ware errors reading,exiting program.")
-			return
+
+		//fmt.Println("please input:")
+		input, _, c := inputReader.ReadLine()
+		if c == io.EOF {
+			break
 		}
-		set_line([]rune(input))
+		line := string(input) + "\n"
+		fmt.Println(line)
+		set_line([]rune(line))
 		value = parse_line()
 		fmt.Println(">>", reflect.ValueOf(value))
 	}
