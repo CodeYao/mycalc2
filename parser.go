@@ -12,7 +12,16 @@ import (
 var st_look_ahead_token Token
 var st_look_ahead_token_exists int
 
+/*0表示不存在,1表示存在,2表示存在且逻辑表达式为true,3表示逻辑表达式为false*/
+var if_type int = 0
+var else_type int = 0
+
+//var if_st_lines [][]rune
+
 var paramList map[string]Token //变量列表
+
+var fi *os.File
+var inputReader *bufio.Reader
 
 func my_get_token(token *Token) {
 	if st_look_ahead_token_exists == 1 {
@@ -123,6 +132,41 @@ func parse_primary_expression() interface{} {
 		}
 	}
 
+	//如果是if
+	if token.kind == IF_TOKEN {
+		if_type = 1
+		my_get_token(&token)
+		if token.kind == LEFT_PAREN_TOKEN {
+			value = parse_logic_expression()
+			my_get_token(&token)
+			if token.kind != RIGHT_PAREN_TOKEN {
+				fmt.Println("missing ')' error.")
+				os.Exit(1)
+			}
+			if value.(bool) {
+				fmt.Println("if true")
+				if_type = 2
+				my_get_token(&token)
+				if token.kind == LEFT_BRACES_TOKEN {
+					//fmt.Println("--------{---------")
+					getCode()
+					//my_get_token(&token)
+					//value
+					// if token.kind != RIGHT_BRACES_TOKEN {
+					// 	fmt.Println("missing '}' error.")
+					// 	os.Exit(1)
+					// }
+				}
+				//os.Exit(1)
+			} else {
+				fmt.Println("if false")
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("missing '(' error.")
+			os.Exit(1)
+		}
+	}
 	//如果是常量
 	if token.kind == NUMBER_TOKEN {
 		value = token.value
@@ -146,7 +190,7 @@ func parse_primary_expression() interface{} {
 	} else {
 		unget_token(&token)
 	}
-
+	//fmt.Println(reflect.ValueOf(value), "************")
 	if reflect.TypeOf(value).String() == "float32" || reflect.TypeOf(value).String() == "float64" {
 		value = reflect.ValueOf(value).Float()
 		if minus_flages == 1 {
@@ -538,18 +582,42 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 	}
 	return value
 }
+func getCode() {
+	var value interface{}
+	for {
+		input, _, c := inputReader.ReadLine()
+		if c == io.EOF {
+			fmt.Println("if error")
+			fmt.Println("missing '}' error.")
+			os.Exit(1)
+		}
+		//fmt.Println(len(input), string(input), "kkk")
 
+		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
+			continue
+		} else {
+			line := string(input) + "\n"
+			fmt.Println(line)
+			set_line([]rune(line))
+
+			if strings.Replace(string(input), " ", "", -1) == "}" {
+				break
+			}
+			value = parse_line()
+			fmt.Println(">>", reflect.ValueOf(value))
+		}
+	}
+}
 func parse_line() interface{} {
 	var value interface{}
 
 	st_look_ahead_token_exists = 0
 	value = parse_logic_expression()
-
 	return value
 }
-
-func main() {
+func excutes() {
 	var value interface{}
+
 	paramList = make(map[string]Token) //变量列表
 	// for {
 	// 	inputReader := bufio.NewReader(os.Stdin)
@@ -563,15 +631,8 @@ func main() {
 	// 	value = parse_line()
 	// 	fmt.Println(">>", reflect.ValueOf(value))
 	// }
-	fi, err := os.Open("D:\\0_chenyao\\git\\src\\fate\\mycalc2\\test.fate")
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		return
-	}
-	defer fi.Close()
-	inputReader := bufio.NewReader(fi)
-	for {
 
+	for {
 		//fmt.Println("please input:")
 		input, _, c := inputReader.ReadLine()
 		if c == io.EOF {
@@ -587,5 +648,16 @@ func main() {
 			fmt.Println(">>", reflect.ValueOf(value))
 		}
 	}
+}
 
+func main() {
+	var err error
+	fi, err = os.Open("D:\\work\\TongJi\\go_work\\src\\src\\github.com\\fate\\mycalc2\\test.fate")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return
+	}
+	defer fi.Close()
+	inputReader = bufio.NewReader(fi)
+	excutes()
 }

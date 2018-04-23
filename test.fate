@@ -1,18 +1,10 @@
-let a int16 = 5
-let b int8 = 5
-
-b = b+1
-a>=b
-a>b
-
-a<=b
-a<b
-
-a!=b
-a==b
-
-let c bool = true
-let d bool = false
-
-c||d
-c&&d
+let a int8 = (1+2)*3
+if(a==10||a==9){
+    if(1==1){
+        a=10
+    }
+    a=a+1
+    a=6+a
+    a = 7
+}
+a=10+a

@@ -57,6 +57,12 @@ func getToken(token *Token) {
 				token.kind = STATE_TYPE_TOKEN
 			} else if IsBool(token.str) {
 				token.kind = BOOL_TOKEN
+			} else if IsFlowType(token.str) {
+				if token.str == "if" {
+					token.kind = IF_TOKEN
+				} else if token.str == "else" {
+					token.kind = ELSE_TOKEN
+				}
 			} else {
 				token.kind = STATE_TOKEN
 			}
@@ -197,6 +203,12 @@ func getToken(token *Token) {
 			} else if current_char == ')' {
 				token.kind = RIGHT_PAREN_TOKEN
 				return
+			} else if current_char == '{' {
+				token.kind = LEFT_BRACES_TOKEN
+				return
+			} else if current_char == '}' {
+				token.kind = RIGHT_BRACES_TOKEN
+				return
 			} else {
 				fmt.Println("bad character(", current_char, ")")
 				os.Exit(1)
@@ -232,6 +244,15 @@ func IsKeyWord(str string) bool {
 func IsStatement(str string) bool {
 	for _, statementword := range StatementWords {
 		if statementword == str {
+			return true
+		}
+	}
+	return false
+}
+
+func IsFlowType(str string) bool {
+	for _, flowword := range FlowWords {
+		if flowword == str {
 			return true
 		}
 	}

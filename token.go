@@ -8,6 +8,8 @@ type TokenType int
 
 type StateType int
 
+type FlowType int
+
 const (
 	BAD_TOKEN          TokenKind = iota //意外的标识符
 	NUMBER_TOKEN                        //数字标识符
@@ -16,6 +18,8 @@ const (
 	STRING_TOKEN                        //字符串标识符
 	STRING_SIGN_TOKEN                   //双引号"标识符
 	BOOL_TOKEN                          //布尔标识符
+	IF_TOKEN                            //if标识符
+	ELSE_TOKEN                          //else标识符
 	PARAM_TOKEN                         //变量标识符
 	STATE_TOKEN                         //声明变量标识符
 	STATE_TYPE_TOKEN                    //声明类型标识符let,set
@@ -28,6 +32,8 @@ const (
 	ASS_OPERATOR_TOKEN                  //赋值
 	LEFT_PAREN_TOKEN                    //左括号
 	RIGHT_PAREN_TOKEN                   //右括号
+	LEFT_BRACES_TOKEN                   //左大括号
+	RIGHT_BRACES_TOKEN                  //右大括号
 	END_OF_LINE_TOKEN                   //行结束符
 	EQ_TOKEN                            // ==
 	NE_TOKEN                            // !=
@@ -62,7 +68,14 @@ const (
 	SET
 )
 
+const (
+	IF FlowType = iota
+	ELSE
+	ELSEIF
+)
+
 var KeyWords = []string{"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "bool", "float32", "float64", "string", "char"}
+var FlowWords = []string{"if", "else", "else if"}
 var StatementWords = []string{"let", "set"}
 
 type Token struct {
