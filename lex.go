@@ -29,12 +29,13 @@ func getToken(token *Token) {
 	var out_pos int = 0
 	var status LexerStatus = INITIAL_STATUS
 	var current_char rune
+	var next_char rune
 	token.str = ""
 	token.kind = BAD_TOKEN
 	for {
-		if st_line[st_line_pos] == '\000' {
-			break
-		}
+		// if st_line[st_line_pos] == '\000' {
+		// 	break
+		// }
 		current_char = st_line[st_line_pos]
 		//fmt.Println("current_char---(", string(current_char), ")")
 		if (status == IN_INT_PART_STATUS || status == IN_FRAC_PART_STATUS) && !unicode.IsDigit(current_char) && current_char != '.' {
@@ -49,7 +50,7 @@ func getToken(token *Token) {
 		}
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
-			fmt.Println("current_str---(", token.str, ")")
+			//fmt.Println("current_str---(", token.str, ")")
 			if IsKeyWord(token.str) {
 				token.kind = TOKEN_TYPE_TOKEN
 			} else if IsStatement(token.str) {
@@ -61,9 +62,9 @@ func getToken(token *Token) {
 			}
 			return
 		}
-
+		//跳过空格
 		if unicode.IsSpace(current_char) {
-			fmt.Println("current_char-------(", string(current_char), ")")
+			//fmt.Println("current_char-------(", string(current_char), ")")
 			if current_char == '\n' {
 				token.kind = END_OF_LINE_TOKEN
 				return
@@ -81,6 +82,7 @@ func getToken(token *Token) {
 		token.str += string(st_line[st_line_pos])
 		st_line_pos++
 		out_pos++
+		next_char = st_line[st_line_pos]
 		if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
 			if current_char == '+' {
 				token.kind = ADD_OPERATOR_TOKEN
@@ -95,7 +97,67 @@ func getToken(token *Token) {
 				token.kind = DIV_OPERATOR_TOKEN
 				return
 			} else if current_char == '=' {
+				if next_char == '=' { //判断下一个标识
+					token.kind = EQ_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = "=="
+					return
+				}
 				token.kind = ASS_OPERATOR_TOKEN
+				return
+			} else if current_char == '>' {
+				if next_char == '=' { //判断下一个标识
+					token.kind = GE_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = ">="
+					return
+				}
+				token.kind = GT_TOKEN
+				return
+			} else if current_char == '<' {
+				if next_char == '=' { //判断下一个标识
+					token.kind = LE_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = ">="
+					return
+				}
+				token.kind = LT_TOKEN
+				return
+			} else if current_char == '!' {
+				if next_char == '=' { //判断下一个标识
+					token.kind = NE_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = "!="
+					return
+				}
+				token.kind = BAD_TOKEN
+				return
+			} else if current_char == '|' {
+				if next_char == '|' { //判断下一个标识
+					token.kind = LOGICAL_OR_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = "||"
+					return
+				}
+				token.kind = BAD_TOKEN
+				return
+			} else if current_char == '&' {
+				if next_char == '&' { //判断下一个标识
+					token.kind = LOGICAL_AND_TOKEN
+					st_line_pos++
+					out_pos++
+					token.str = "&&"
+					return
+				}
+				token.kind = BAD_TOKEN
+				return
+			} else if current_char == '%' {
+				token.kind = MOD_OPERATOR_TOKEN
 				return
 			} else if unicode.IsDigit(current_char) {
 				if status == INITIAL_STATUS {
@@ -177,7 +239,7 @@ func IsStatement(str string) bool {
 }
 
 func IsBool(str string) bool {
-	if str == "true" || str == "true" {
+	if str == "true" || str == "false" {
 		return true
 	} else {
 		return false

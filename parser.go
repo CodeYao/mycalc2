@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strings"
 )
 
 var st_look_ahead_token Token
@@ -166,7 +167,6 @@ func parse_primary_expression() interface{} {
 	} // else {
 	// 	fmt.Println("These Type can not be negative ", reflect.TypeOf(value).String())
 	// }
-
 	return value
 }
 
@@ -178,7 +178,7 @@ func parse_term() interface{} {
 	v1 = parse_primary_expression()
 	for {
 		my_get_token(&token)
-		if token.kind != DIV_OPERATOR_TOKEN && token.kind != MUL_OPERATOR_TOKEN {
+		if token.kind != DIV_OPERATOR_TOKEN && token.kind != MUL_OPERATOR_TOKEN && token.kind != MOD_OPERATOR_TOKEN {
 			unget_token(&token)
 			break
 		}
@@ -209,11 +209,48 @@ func parse_term() interface{} {
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
+			} else if token.kind == MOD_OPERATOR_TOKEN {
+				//fmt.Println("MOD_OPERATOR_TOKEN")
+				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+					v1 = int64(reflect.ValueOf(v1).Float()) % int64(reflect.ValueOf(v2).Float())
+				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+					v1 = reflect.ValueOf(v1).Int() % reflect.ValueOf(v2).Int()
+				} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+					v1 = reflect.ValueOf(v1).Uint() % reflect.ValueOf(v2).Uint()
+				} else {
+					fmt.Println("These Type can not mod ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+				}
+				v1 = float64(v1.(int64))
 			} else {
 				unget_token(&token)
 			}
 		} else {
-			fmt.Println("Type inconsistency ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+			if token.kind == MOD_OPERATOR_TOKEN {
+				if !strings.Contains(reflect.ValueOf(v1).String(), ".") && !strings.Contains(reflect.ValueOf(v2).String(), ".") {
+					if reflect.TypeOf(v1).String() == "float64" {
+						v1 = int64(v1.(float64))
+					} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+						v1 = reflect.ValueOf(v1).Int()
+					} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+						v1 = reflect.ValueOf(v1).Uint()
+						v1 = int64(v1.(uint64))
+					}
+					if reflect.TypeOf(v2).String() == "float64" {
+						v2 = int64(v2.(float64))
+					} else if reflect.TypeOf(v2).String() == "int8" || reflect.TypeOf(v2).String() == "int16" || reflect.TypeOf(v2).String() == "int32" || reflect.TypeOf(v2).String() == "int64" {
+						v2 = reflect.ValueOf(v2).Int()
+					} else if reflect.TypeOf(v2).String() == "uint8" || reflect.TypeOf(v2).String() == "uint16" || reflect.TypeOf(v2).String() == "uint32" || reflect.TypeOf(v2).String() == "uint64" {
+						v2 = reflect.ValueOf(v2).Uint()
+						v2 = int64(v2.(uint64))
+					}
+					v1 = v1.(int64) % v2.(int64)
+					v1 = float64(v1.(int64))
+				} else {
+					fmt.Println("These Type can not mod ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+				}
+			} else {
+				fmt.Println("Type inconsistency ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+			}
 		}
 	}
 	//fmt.Println("v1...", v1)
@@ -235,7 +272,7 @@ func parse_expression() interface{} {
 		v2 = parse_term()
 		if reflect.TypeOf(v1).String() == reflect.TypeOf(v2).String() {
 			if token.kind == ADD_OPERATOR_TOKEN {
-				fmt.Println("======", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+				//fmt.Println("======", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() + reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
@@ -266,6 +303,130 @@ func parse_expression() interface{} {
 			}
 		} else {
 			fmt.Println("Type inconsistency ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
+		}
+	}
+	return v1
+}
+
+func parse_relation_expression() interface{} {
+	var v1 interface{}
+	var v2 interface{}
+	var token Token
+
+	v1 = parse_expression()
+	for {
+		my_get_token(&token)
+		if token.kind != EQ_TOKEN && token.kind != GE_TOKEN && token.kind != GT_TOKEN && token.kind != LT_TOKEN && token.kind != LE_TOKEN && token.kind != NE_TOKEN {
+			unget_token(&token)
+			break
+		}
+		v2 = parse_expression()
+		if token.kind == EQ_TOKEN {
+			v1 = (v1 == v2)
+			//fmt.Println(v1.(bool))
+		} else if token.kind == GE_TOKEN {
+			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
+			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+				v1 = (reflect.ValueOf(v1).Float() >= reflect.ValueOf(v2).Float())
+			} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+				v1 = (reflect.ValueOf(v1).Int() >= reflect.ValueOf(v2).Int())
+			} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+				v1 = (reflect.ValueOf(v1).Uint() >= reflect.ValueOf(v2).Uint())
+			} else if reflect.TypeOf(v1).String() == "rune" {
+				v1 = (v1.(rune) >= v2.(rune))
+			} else if reflect.TypeOf(v1).String() == "string" {
+				v1 = (v1.(string) >= v2.(string))
+			} else {
+				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
+			}
+			//fmt.Println(v1.(bool))
+		} else if token.kind == GT_TOKEN {
+			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
+			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+				v1 = (reflect.ValueOf(v1).Float() > reflect.ValueOf(v2).Float())
+			} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+				v1 = (reflect.ValueOf(v1).Int() > reflect.ValueOf(v2).Int())
+			} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+				v1 = (reflect.ValueOf(v1).Uint() > reflect.ValueOf(v2).Uint())
+			} else if reflect.TypeOf(v1).String() == "rune" {
+				v1 = (v1.(rune) > v2.(rune))
+			} else if reflect.TypeOf(v1).String() == "string" {
+				v1 = (v1.(string) > v2.(string))
+			} else {
+				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
+			}
+			//fmt.Println(v1.(bool))
+		} else if token.kind == LE_TOKEN {
+			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
+			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+				v1 = (reflect.ValueOf(v1).Float() <= reflect.ValueOf(v2).Float())
+			} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+				v1 = (reflect.ValueOf(v1).Int() <= reflect.ValueOf(v2).Int())
+			} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+				v1 = (reflect.ValueOf(v1).Uint() <= reflect.ValueOf(v2).Uint())
+			} else if reflect.TypeOf(v1).String() == "rune" {
+				v1 = (v1.(rune) <= v2.(rune))
+			} else if reflect.TypeOf(v1).String() == "string" {
+				v1 = (v1.(string) <= v2.(string))
+			} else {
+				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
+			}
+			//fmt.Println(v1.(bool))
+		} else if token.kind == LT_TOKEN {
+			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
+			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+				v1 = (reflect.ValueOf(v1).Float() < reflect.ValueOf(v2).Float())
+			} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+				v1 = (reflect.ValueOf(v1).Int() < reflect.ValueOf(v2).Int())
+			} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+				v1 = (reflect.ValueOf(v1).Uint() < reflect.ValueOf(v2).Uint())
+			} else if reflect.TypeOf(v1).String() == "rune" {
+				v1 = (v1.(rune) < v2.(rune))
+			} else if reflect.TypeOf(v1).String() == "string" {
+				v1 = (v1.(string) < v2.(string))
+			} else {
+				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
+			}
+			//fmt.Println(v1.(bool))
+		} else if token.kind == NE_TOKEN {
+			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
+			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
+				v1 = (reflect.ValueOf(v1).Float() != reflect.ValueOf(v2).Float())
+			} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
+				v1 = (reflect.ValueOf(v1).Int() != reflect.ValueOf(v2).Int())
+			} else if reflect.TypeOf(v1).String() == "uint8" || reflect.TypeOf(v1).String() == "uint16" || reflect.TypeOf(v1).String() == "uint32" || reflect.TypeOf(v1).String() == "uint64" {
+				v1 = (reflect.ValueOf(v1).Uint() != reflect.ValueOf(v2).Uint())
+			} else if reflect.TypeOf(v1).String() == "rune" {
+				v1 = (v1.(rune) != v2.(rune))
+			} else if reflect.TypeOf(v1).String() == "string" {
+				v1 = (v1.(string) != v2.(string))
+			} else {
+				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
+			}
+			//fmt.Println(v1.(bool))
+		}
+	}
+	return v1
+}
+
+func parse_logic_expression() interface{} {
+	var v1 interface{}
+	var v2 interface{}
+	var token Token
+	v1 = parse_relation_expression()
+	for {
+		my_get_token(&token)
+		if token.kind != LOGICAL_AND_TOKEN && token.kind != LOGICAL_OR_TOKEN {
+			unget_token(&token)
+			break
+		}
+		v2 = parse_relation_expression()
+		if token.kind == LOGICAL_AND_TOKEN {
+			//fmt.Println(v1.(bool), "ANDAND", v2.(bool))
+			v1 = (v1.(bool) && v2.(bool))
+		} else if token.kind == LOGICAL_OR_TOKEN {
+			//fmt.Println(v1.(bool), "OROROR", v2.(bool))
+			v1 = (v1.(bool) || v2.(bool))
 		}
 	}
 	return v1
@@ -382,7 +543,7 @@ func parse_line() interface{} {
 	var value interface{}
 
 	st_look_ahead_token_exists = 0
-	value = parse_expression()
+	value = parse_logic_expression()
 
 	return value
 }
@@ -416,11 +577,15 @@ func main() {
 		if c == io.EOF {
 			break
 		}
-		line := string(input) + "\n"
-		fmt.Println(line)
-		set_line([]rune(line))
-		value = parse_line()
-		fmt.Println(">>", reflect.ValueOf(value))
+		if len(input) == 0 { //跳过空行
+			continue
+		} else {
+			line := string(input) + "\n"
+			fmt.Println(line)
+			set_line([]rune(line))
+			value = parse_line()
+			fmt.Println(">>", reflect.ValueOf(value))
+		}
 	}
 
 }

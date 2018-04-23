@@ -9,25 +9,35 @@ type TokenType int
 type StateType int
 
 const (
-	BAD_TOKEN TokenKind = iota
-	NUMBER_TOKEN
-	CHAR_TOKEN
-	CHAR_SIGN_TOKEN
-	STRING_TOKEN
-	STRING_SIGN_TOKEN
-	BOOL_TOKEN
-	PARAM_TOKEN
-	STATE_TOKEN
-	STATE_TYPE_TOKEN
-	TOKEN_TYPE_TOKEN
-	ADD_OPERATOR_TOKEN
-	SUB_OPERATOR_TOKEN
-	MUL_OPERATOR_TOKEN
-	DIV_OPERATOR_TOKEN
-	ASS_OPERATOR_TOKEN
-	LEFT_PAREN_TOKEN
-	RIGHT_PAREN_TOKEN
-	END_OF_LINE_TOKEN
+	BAD_TOKEN          TokenKind = iota //意外的标识符
+	NUMBER_TOKEN                        //数字标识符
+	CHAR_TOKEN                          //字符标识符
+	CHAR_SIGN_TOKEN                     //单引号'标识符
+	STRING_TOKEN                        //字符串标识符
+	STRING_SIGN_TOKEN                   //双引号"标识符
+	BOOL_TOKEN                          //布尔标识符
+	PARAM_TOKEN                         //变量标识符
+	STATE_TOKEN                         //声明变量标识符
+	STATE_TYPE_TOKEN                    //声明类型标识符let,set
+	TOKEN_TYPE_TOKEN                    //变量类型标识符int,float...
+	ADD_OPERATOR_TOKEN                  //加法
+	SUB_OPERATOR_TOKEN                  //减法
+	MUL_OPERATOR_TOKEN                  //乘法
+	DIV_OPERATOR_TOKEN                  //除法
+	MOD_OPERATOR_TOKEN                  //取余
+	ASS_OPERATOR_TOKEN                  //赋值
+	LEFT_PAREN_TOKEN                    //左括号
+	RIGHT_PAREN_TOKEN                   //右括号
+	END_OF_LINE_TOKEN                   //行结束符
+	EQ_TOKEN                            // ==
+	NE_TOKEN                            // !=
+	GT_TOKEN                            // >
+	GE_TOKEN                            // >=
+	LT_TOKEN                            // <
+	LE_TOKEN                            // <=
+	LOGICAL_AND_TOKEN                   // &&
+	LOGICAL_OR_TOKEN                    // ||
+
 )
 
 const (
