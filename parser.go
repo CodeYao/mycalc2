@@ -12,6 +12,8 @@ import (
 var st_look_ahead_token Token
 var st_look_ahead_token_exists int
 
+var stl_bak int = 0
+
 /*0表示不存在,1表示存在,2表示存在且逻辑表达式为true,3表示逻辑表达式为false*/
 var if_type int = 0
 var else_type int = 0
@@ -131,11 +133,29 @@ func parse_primary_expression() interface{} {
 			os.Exit(1)
 		}
 	}
-
+	//如果是else
+	if token.kind == ELSE_TOKEN {
+		value = true
+		if else_type == 2 && if_type == 3 {
+			my_get_token(&token)
+			if token.kind == LEFT_BRACES_TOKEN {
+				getCode()
+				else_type = 0
+				if_type = 0
+			} else if token.kind == IF_TOKEN {
+				//unget_token(&token)
+				else_type = 0
+			}
+		} else if else_type == 2 && if_type == 0 {
+			fmt.Println("Miss if error")
+			os.Exit(1)
+		}
+	}
 	//如果是if
 	if token.kind == IF_TOKEN {
 		if_type = 1
 		my_get_token(&token)
+		fmt.Println("if token", token.str)
 		if token.kind == LEFT_PAREN_TOKEN {
 			value = parse_logic_expression()
 			my_get_token(&token)
@@ -148,19 +168,14 @@ func parse_primary_expression() interface{} {
 				if_type = 2
 				my_get_token(&token)
 				if token.kind == LEFT_BRACES_TOKEN {
-					//fmt.Println("--------{---------")
 					getCode()
-					//my_get_token(&token)
-					//value
-					// if token.kind != RIGHT_BRACES_TOKEN {
-					// 	fmt.Println("missing '}' error.")
-					// 	os.Exit(1)
-					// }
 				}
-				//os.Exit(1)
+				if_type = 0
 			} else {
+				if_type = 3
+				else_type = 2
 				fmt.Println("if false")
-				os.Exit(1)
+				skipCode()
 			}
 		} else {
 			fmt.Println("missing '(' error.")
@@ -591,15 +606,14 @@ func getCode() {
 			fmt.Println("missing '}' error.")
 			os.Exit(1)
 		}
-		//fmt.Println(len(input), string(input), "kkk")
+		fmt.Println(len(input), string(input), "get")
 
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
 			line := string(input) + "\n"
-			fmt.Println(line)
+			//fmt.Println("get", line)
 			set_line([]rune(line))
-
 			if strings.Replace(string(input), " ", "", -1) == "}" {
 				break
 			}
@@ -608,13 +622,44 @@ func getCode() {
 		}
 	}
 }
-func parse_line() interface{} {
-	var value interface{}
 
-	st_look_ahead_token_exists = 0
-	value = parse_logic_expression()
-	return value
+//跳过{...}
+func skipCode() {
+	var braces_num int = 1
+	for {
+		input, _, c := inputReader.ReadLine()
+		if c == io.EOF {
+			fmt.Println("if error")
+			fmt.Println("missing '}' error.")
+			os.Exit(1)
+		}
+		//fmt.Println(len(input), string(input), "kkk")
+
+		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
+			continue
+		} else {
+
+			line := string(input) + "\n"
+			fmt.Println("sk", line)
+			if strings.Contains(string(input), "}") {
+				braces_num--
+				if strings.Contains(string(input), "else") && braces_num == 0 {
+					set_line([]rune(strings.TrimSpace(string(input)))[1:])
+					fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					stl_bak = 1
+					break
+				}
+			}
+			if strings.Contains(string(input), "{") {
+				braces_num++
+			}
+			if braces_num == 0 {
+				break
+			}
+		}
+	}
 }
+
 func excutes() {
 	var value interface{}
 
@@ -634,25 +679,41 @@ func excutes() {
 
 	for {
 		//fmt.Println("please input:")
-		input, _, c := inputReader.ReadLine()
-		if c == io.EOF {
-			break
-		}
-		if len(input) == 0 { //跳过空行
-			continue
+		if stl_bak == 0 {
+			input, _, c := inputReader.ReadLine()
+			if c == io.EOF {
+				break
+			}
+			if len(input) == 0 { //跳过空行
+				continue
+			} else {
+				line := string(input) + "\n"
+				fmt.Println(line)
+				set_line([]rune(line))
+				value = parse_line()
+				fmt.Println(">>", reflect.ValueOf(value))
+			}
 		} else {
-			line := string(input) + "\n"
-			fmt.Println(line)
-			set_line([]rune(line))
+			stl_bak = 0
 			value = parse_line()
 			fmt.Println(">>", reflect.ValueOf(value))
 		}
+
 	}
+}
+
+func parse_line() interface{} {
+	var value interface{}
+
+	st_look_ahead_token_exists = 0
+	value = parse_logic_expression()
+	return value
 }
 
 func main() {
 	var err error
-	fi, err = os.Open("D:\\work\\TongJi\\go_work\\src\\src\\github.com\\fate\\mycalc2\\test.fate")
+	//fi, err = os.Open("D:\\work\\TongJi\\go_work\\src\\src\\github.com\\fate\\mycalc2\\test.fate")
+	fi, err = os.Open("D:\\0_chenyao\\git\\src\\fate\\mycalc2\\test.fate")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return

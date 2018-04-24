@@ -88,7 +88,6 @@ func getToken(token *Token) {
 		token.str += string(st_line[st_line_pos])
 		st_line_pos++
 		out_pos++
-		next_char = st_line[st_line_pos]
 		if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
 			if current_char == '+' {
 				token.kind = ADD_OPERATOR_TOKEN
@@ -103,6 +102,7 @@ func getToken(token *Token) {
 				token.kind = DIV_OPERATOR_TOKEN
 				return
 			} else if current_char == '=' {
+				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
 					token.kind = EQ_TOKEN
 					st_line_pos++
@@ -113,6 +113,7 @@ func getToken(token *Token) {
 				token.kind = ASS_OPERATOR_TOKEN
 				return
 			} else if current_char == '>' {
+				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
 					token.kind = GE_TOKEN
 					st_line_pos++
@@ -123,6 +124,7 @@ func getToken(token *Token) {
 				token.kind = GT_TOKEN
 				return
 			} else if current_char == '<' {
+				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
 					token.kind = LE_TOKEN
 					st_line_pos++
@@ -133,6 +135,7 @@ func getToken(token *Token) {
 				token.kind = LT_TOKEN
 				return
 			} else if current_char == '!' {
+				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
 					token.kind = NE_TOKEN
 					st_line_pos++
@@ -143,6 +146,7 @@ func getToken(token *Token) {
 				token.kind = BAD_TOKEN
 				return
 			} else if current_char == '|' {
+				next_char = st_line[st_line_pos]
 				if next_char == '|' { //判断下一个标识
 					token.kind = LOGICAL_OR_TOKEN
 					st_line_pos++
@@ -153,6 +157,7 @@ func getToken(token *Token) {
 				token.kind = BAD_TOKEN
 				return
 			} else if current_char == '&' {
+				next_char = st_line[st_line_pos]
 				if next_char == '&' { //判断下一个标识
 					token.kind = LOGICAL_AND_TOKEN
 					st_line_pos++
@@ -283,12 +288,28 @@ func IsBool(str string) bool {
 // 	}
 // }
 // func main() {
-// 	inputReader := bufio.NewReader(os.Stdin)
-// 	fmt.Println("please input:")
-// 	input, err := inputReader.ReadString('\n')
+// 	fi, err := os.Open("D:\\0_chenyao\\git\\src\\fate\\mycalc2\\test.fate")
 // 	if err != nil {
-// 		fmt.Println("There ware errors reading,exiting program.")
+// 		fmt.Printf("Error: %s\n", err)
 // 		return
 // 	}
-// 	parse_line([]rune(input))
+// 	defer fi.Close()
+// 	inputReader := bufio.NewReader(fi)
+// 	for {
+// 		//fmt.Println("please input:")
+// 		input, _, c := inputReader.ReadLine()
+// 		if c == io.EOF {
+// 			break
+// 		}
+// 		if len(input) == 0 { //跳过空行
+// 			continue
+// 		} else {
+// 			line := string(input) + "\n"
+// 			fmt.Println(line)
+// 			set_line([]rune(line))
+// 			parse_line([]rune(line))
+// 			//fmt.Println(">>", reflect.ValueOf(value))
+// 		}
+// 	}
+
 // }
