@@ -2,17 +2,24 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/tjfoc/tjfoc/core/store"
 )
 
+var db interface{}
 var st_look_ahead_token Token
 var st_look_ahead_token_exists int
 
 var stl_bak int = 0
+
+var inBody int = 0
+var bodyLine int = 0
 
 /*0表示不存在,1表示存在,2表示存在且逻辑表达式为true,3表示逻辑表达式为false*/
 var if_type int = 0
@@ -20,7 +27,8 @@ var else_type int = 0
 
 //var if_st_lines [][]rune
 
-var paramList map[string]Token //变量列表
+var paramList map[string]Token   //变量列表
+var dbParamList map[string]Token //数据库变量列表
 
 var fi *os.File
 var inputReader *bufio.Reader
@@ -40,12 +48,13 @@ func unget_token(token *Token) {
 }
 
 func parse_primary_expression() interface{} {
+	var fortoken ForToken
 	var token Token
 	var value interface{}
 	var minus_flages int = 0
 
 	my_get_token(&token)
-	if token.kind == SUB_OPERATOR_TOKEN {
+	if token.Kind == SUB_OPERATOR_TOKEN {
 		minus_flages = 1
 	} else {
 		unget_token(&token)
@@ -54,48 +63,52 @@ func parse_primary_expression() interface{} {
 	my_get_token(&token)
 
 	//判断是否声明变量
-	if token.kind == STATE_TYPE_TOKEN {
+	if token.Kind == STATE_TYPE_TOKEN {
 		state_token := token
 		my_get_token(&token)
 		//获取变量名，放入map
-		if token.kind == STATE_TOKEN {
-			if state_token.str == "let" {
-				token.stateType = LET
-			} else if state_token.str == "set" {
-				token.stateType = SET
+		if token.Kind == STATE_TOKEN {
+			if state_token.Str == "let" {
+				token.StateType = LET
+			} else if state_token.Str == "set" {
+				token.StateType = SET
 			}
 			stk := token
 			my_get_token(&token)
 			//获取变量类型
-			if token.kind == TOKEN_TYPE_TOKEN {
-				stk.tokenType = getTokenType(token.str)
-				if stk.tokenType == ERRORTYPE {
-					fmt.Println("error type : ", token.str)
+			if token.Kind == TOKEN_TYPE_TOKEN {
+				stk.TokenType = getTokenType(token.Str)
+				if stk.TokenType == ERRORTYPE {
+					fmt.Println("error type : ", token.Str)
 					os.Exit(1)
 				}
 
 				my_get_token(&token)
 
 				//变量后续是否为赋值操作
-				if token.kind == ASS_OPERATOR_TOKEN {
+				if token.Kind == ASS_OPERATOR_TOKEN {
 					value = parse_expression()
-					value = getValue(stk.tokenType, value, minus_flages)
+					value = getValue(stk.TokenType, value, minus_flages)
+					//fmt.Printfln("---", reflect.TypeOf(value).String())
+					//fmt.Println("b : ", reflect.TypeOf(value).String())
 					// tokentype := getTokenType(reflect.TypeOf(value).String())
 					// if stk.tokenType != tokentype {
 					// 	fmt.Println("The type of variable assignment is not consistent : ", token.str)
 					// 	os.Exit(1)
 					// }
-
-					if _, ok := paramList[stk.str]; ok {
-						fmt.Println("error the variable is existed : ", stk.str)
+					if _, ok := paramList[stk.Str]; ok {
+						fmt.Println("error the variable is existed : ", stk.Str)
 						os.Exit(1)
 					} else {
-						stk.value = value
-						paramList[stk.str] = stk
+						stk.Value = value
+						paramList[stk.Str] = stk
+						if stk.StateType == SET {
+							dbParamList[stk.Str] = stk
+						}
 					}
 				} else {
 					unget_token(&token)
-					paramList[stk.str] = stk
+					paramList[stk.Str] = stk
 					return value
 				}
 			}
@@ -103,46 +116,53 @@ func parse_primary_expression() interface{} {
 	}
 
 	/*获取变量，返回value*/
-	if token.kind == STATE_TOKEN {
+	if token.Kind == STATE_TOKEN {
 		//判断是否已经声明
-		if tk, ok := paramList[token.str]; ok {
+		if tk, ok := paramList[token.Str]; ok {
 			my_get_token(&token)
 			//变量后续是否为赋值操作
-			if token.kind == ASS_OPERATOR_TOKEN {
+			if token.Kind == ASS_OPERATOR_TOKEN {
 				value = parse_expression()
 				//value = getValue(tk.tokenType, value, minus_flages)
-				tk.value = getValue(tk.tokenType, value, minus_flages)
-				paramList[tk.str] = tk
-				fmt.Println(tk.str, " :: ", tk.value)
+				tk.Value = getValue(tk.TokenType, value, minus_flages)
+				paramList[tk.Str] = tk
+				if tk.StateType == SET {
+					dbParamList[tk.Str] = tk
+				}
+				//fmt.Println(tk.str, " :: ", tk.value)
 			} else {
 				unget_token(&token)
-				if t, ok := paramList[tk.str]; ok {
-					fmt.Println(t.str, " : ", t.value)
+				if t, ok := paramList[tk.Str]; ok {
+					//fmt.Println(t.str, " : ", t.value)
 					//遗留问题
 					// if minus_flages == 1 {
 					// 	return getValue(t.tokenType, value, minus_flages)
 					// }
-					value = t.value
+					value = t.Value
 				} else {
-					fmt.Println("Undeclared variables : ", tk.str)
+					fmt.Println("Undeclared variables : ", tk.Str)
 					os.Exit(1)
 				}
 			}
 		} else {
-			fmt.Println("an undeclared variable : ", token.str)
+			fmt.Println("an undeclared variable : ", token.Str)
 			os.Exit(1)
 		}
 	}
 	//如果是else
-	if token.kind == ELSE_TOKEN {
+	if token.Kind == ELSE_TOKEN {
 		value = true
 		if else_type == 2 && if_type == 3 {
 			my_get_token(&token)
-			if token.kind == LEFT_BRACES_TOKEN {
-				getCode()
+			if token.Kind == LEFT_BRACES_TOKEN {
+				if inBody == 1 {
+					getCodeInBody(&fortoken)
+				} else {
+					getCode()
+				}
 				else_type = 0
 				if_type = 0
-			} else if token.kind == IF_TOKEN {
+			} else if token.Kind == IF_TOKEN {
 				//unget_token(&token)
 				else_type = 0
 			}
@@ -150,58 +170,83 @@ func parse_primary_expression() interface{} {
 			fmt.Println("Miss if error")
 			os.Exit(1)
 		} else if else_type == 0 {
-			skipCode()
+			if inBody == 1 {
+				skipCodeInBody(&fortoken)
+			} else {
+				skipCode()
+			}
 		}
 	}
 	//如果是if
-	if token.kind == IF_TOKEN {
+	if token.Kind == IF_TOKEN {
 		if_type = 1
 		my_get_token(&token)
 		//fmt.Println("if token", token.str)
-		if token.kind == LEFT_PAREN_TOKEN {
+		if token.Kind == LEFT_PAREN_TOKEN {
 			value = parse_logic_expression()
 			my_get_token(&token)
-			if token.kind != RIGHT_PAREN_TOKEN {
+			if token.Kind != RIGHT_PAREN_TOKEN {
 				fmt.Println("missing ')' error.")
 				os.Exit(1)
 			}
 			if value.(bool) {
-				fmt.Println("if true")
+				//fmt.Println("if true")
 				if_type = 2
 				my_get_token(&token)
-				if token.kind == LEFT_BRACES_TOKEN {
-					getCode()
+				if token.Kind == LEFT_BRACES_TOKEN {
+					if inBody == 1 {
+						getCodeInBody(&fortoken)
+					} else {
+						getCode()
+					}
 				}
 				if_type = 0
 			} else {
 				if_type = 3
 				else_type = 2
-				fmt.Println("if false")
-				skipCode()
+				//fmt.Println("if false")
+				if inBody == 1 {
+					skipCodeInBody(&fortoken)
+				} else {
+					skipCode()
+				}
 			}
 		} else {
 			fmt.Println("missing '(' error.")
 			os.Exit(1)
 		}
 	}
+	//如果是for
+	if token.Kind == FOR_TOKEN {
+		fmt.Println("for")
+		value = 0.0
+		condition := getCondition()
+		fortoken.Condition1 = condition[0]
+		fortoken.Condition2 = condition[1]
+		fortoken.Condition3 = condition[2]
+
+		bodyCode := getBodyCode()
+		fortoken.Body = bodyCode
+		runFor(&fortoken)
+	}
 	//如果是常量
-	if token.kind == NUMBER_TOKEN {
-		value = token.value
-	} else if token.kind == LEFT_PAREN_TOKEN {
+	if token.Kind == NUMBER_TOKEN {
+		value = token.Value
+	} else if token.Kind == LEFT_PAREN_TOKEN {
 		value = parse_expression()
 		my_get_token(&token)
-		if token.kind != RIGHT_PAREN_TOKEN {
+		if token.Kind != RIGHT_PAREN_TOKEN {
 			fmt.Println("missing ')' error.")
 			os.Exit(1)
 		}
-	} else if token.kind == CHAR_TOKEN || token.kind == STRING_TOKEN {
-		value = string([]rune(token.str)[1 : len(token.str)-1])
-		fmt.Println(token.str, " ----------- ", value.(string))
+	} else if token.Kind == CHAR_TOKEN || token.Kind == STRING_TOKEN {
+		value = string([]rune(token.Str)[1 : len(token.Str)-1])
+		fmt.Println(token.Str, " ----------- ", value.(string))
 
-	} else if token.kind == BOOL_TOKEN {
-		if token.str == "true" {
+	} else if token.Kind == BOOL_TOKEN {
+		if token.Str == "true" {
 			value = true
-		} else if token.str == "false" {
+		} else if token.Str == "false" {
 			value = false
 		}
 	} else {
@@ -239,14 +284,14 @@ func parse_term() interface{} {
 	v1 = parse_primary_expression()
 	for {
 		my_get_token(&token)
-		if token.kind != DIV_OPERATOR_TOKEN && token.kind != MUL_OPERATOR_TOKEN && token.kind != MOD_OPERATOR_TOKEN {
+		if token.Kind != DIV_OPERATOR_TOKEN && token.Kind != MUL_OPERATOR_TOKEN && token.Kind != MOD_OPERATOR_TOKEN {
 			unget_token(&token)
 			break
 		}
 		v2 = parse_primary_expression()
 
 		if reflect.TypeOf(v1).String() == reflect.TypeOf(v2).String() {
-			if token.kind == MUL_OPERATOR_TOKEN {
+			if token.Kind == MUL_OPERATOR_TOKEN {
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() * reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
@@ -258,7 +303,7 @@ func parse_term() interface{} {
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
-			} else if token.kind == DIV_OPERATOR_TOKEN {
+			} else if token.Kind == DIV_OPERATOR_TOKEN {
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() / reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
@@ -270,7 +315,7 @@ func parse_term() interface{} {
 				} else {
 					fmt.Println("These Type can not sub ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
-			} else if token.kind == MOD_OPERATOR_TOKEN {
+			} else if token.Kind == MOD_OPERATOR_TOKEN {
 				//fmt.Println("MOD_OPERATOR_TOKEN")
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = int64(reflect.ValueOf(v1).Float()) % int64(reflect.ValueOf(v2).Float())
@@ -286,7 +331,7 @@ func parse_term() interface{} {
 				unget_token(&token)
 			}
 		} else {
-			if token.kind == MOD_OPERATOR_TOKEN {
+			if token.Kind == MOD_OPERATOR_TOKEN {
 				if !strings.Contains(reflect.ValueOf(v1).String(), ".") && !strings.Contains(reflect.ValueOf(v2).String(), ".") {
 					if reflect.TypeOf(v1).String() == "float64" {
 						v1 = int64(v1.(float64))
@@ -326,13 +371,13 @@ func parse_expression() interface{} {
 	v1 = parse_term()
 	for {
 		my_get_token(&token)
-		if token.kind != ADD_OPERATOR_TOKEN && token.kind != SUB_OPERATOR_TOKEN {
+		if token.Kind != ADD_OPERATOR_TOKEN && token.Kind != SUB_OPERATOR_TOKEN {
 			unget_token(&token)
 			break
 		}
 		v2 = parse_term()
 		if reflect.TypeOf(v1).String() == reflect.TypeOf(v2).String() {
-			if token.kind == ADD_OPERATOR_TOKEN {
+			if token.Kind == ADD_OPERATOR_TOKEN {
 				//fmt.Println("======", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() + reflect.ValueOf(v2).Float()
@@ -347,7 +392,7 @@ func parse_expression() interface{} {
 				} else {
 					fmt.Println("These Type can not add ", reflect.TypeOf(v1).String(), " : ", reflect.TypeOf(v2).String())
 				}
-			} else if token.kind == SUB_OPERATOR_TOKEN {
+			} else if token.Kind == SUB_OPERATOR_TOKEN {
 				if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 					v1 = reflect.ValueOf(v1).Float() - reflect.ValueOf(v2).Float()
 				} else if reflect.TypeOf(v1).String() == "int8" || reflect.TypeOf(v1).String() == "int16" || reflect.TypeOf(v1).String() == "int32" || reflect.TypeOf(v1).String() == "int64" {
@@ -377,15 +422,15 @@ func parse_relation_expression() interface{} {
 	v1 = parse_expression()
 	for {
 		my_get_token(&token)
-		if token.kind != EQ_TOKEN && token.kind != GE_TOKEN && token.kind != GT_TOKEN && token.kind != LT_TOKEN && token.kind != LE_TOKEN && token.kind != NE_TOKEN {
+		if token.Kind != EQ_TOKEN && token.Kind != GE_TOKEN && token.Kind != GT_TOKEN && token.Kind != LT_TOKEN && token.Kind != LE_TOKEN && token.Kind != NE_TOKEN {
 			unget_token(&token)
 			break
 		}
 		v2 = parse_expression()
-		if token.kind == EQ_TOKEN {
+		if token.Kind == EQ_TOKEN {
 			v1 = (v1 == v2)
 			//fmt.Println(v1.(bool))
-		} else if token.kind == GE_TOKEN {
+		} else if token.Kind == GE_TOKEN {
 			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
 			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 				v1 = (reflect.ValueOf(v1).Float() >= reflect.ValueOf(v2).Float())
@@ -401,7 +446,7 @@ func parse_relation_expression() interface{} {
 				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
 			}
 			//fmt.Println(v1.(bool))
-		} else if token.kind == GT_TOKEN {
+		} else if token.Kind == GT_TOKEN {
 			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
 			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 				v1 = (reflect.ValueOf(v1).Float() > reflect.ValueOf(v2).Float())
@@ -417,7 +462,7 @@ func parse_relation_expression() interface{} {
 				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
 			}
 			//fmt.Println(v1.(bool))
-		} else if token.kind == LE_TOKEN {
+		} else if token.Kind == LE_TOKEN {
 			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
 			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 				v1 = (reflect.ValueOf(v1).Float() <= reflect.ValueOf(v2).Float())
@@ -433,7 +478,7 @@ func parse_relation_expression() interface{} {
 				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
 			}
 			//fmt.Println(v1.(bool))
-		} else if token.kind == LT_TOKEN {
+		} else if token.Kind == LT_TOKEN {
 			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
 			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 				v1 = (reflect.ValueOf(v1).Float() < reflect.ValueOf(v2).Float())
@@ -449,7 +494,7 @@ func parse_relation_expression() interface{} {
 				fmt.Println("These Type can not >= between ", reflect.TypeOf(v1).String(), " and ", reflect.TypeOf(v2).String())
 			}
 			//fmt.Println(v1.(bool))
-		} else if token.kind == NE_TOKEN {
+		} else if token.Kind == NE_TOKEN {
 			//fmt.Println(reflect.ValueOf(v1), "GEGEGE...", reflect.ValueOf(v2))
 			if reflect.TypeOf(v1).String() == "float32" || reflect.TypeOf(v1).String() == "float64" {
 				v1 = (reflect.ValueOf(v1).Float() != reflect.ValueOf(v2).Float())
@@ -477,15 +522,15 @@ func parse_logic_expression() interface{} {
 	v1 = parse_relation_expression()
 	for {
 		my_get_token(&token)
-		if token.kind != LOGICAL_AND_TOKEN && token.kind != LOGICAL_OR_TOKEN {
+		if token.Kind != LOGICAL_AND_TOKEN && token.Kind != LOGICAL_OR_TOKEN {
 			unget_token(&token)
 			break
 		}
 		v2 = parse_relation_expression()
-		if token.kind == LOGICAL_AND_TOKEN {
+		if token.Kind == LOGICAL_AND_TOKEN {
 			//fmt.Println(v1.(bool), "ANDAND", v2.(bool))
 			v1 = (v1.(bool) && v2.(bool))
-		} else if token.kind == LOGICAL_OR_TOKEN {
+		} else if token.Kind == LOGICAL_OR_TOKEN {
 			//fmt.Println(v1.(bool), "OROROR", v2.(bool))
 			v1 = (v1.(bool) || v2.(bool))
 		}
@@ -601,7 +646,7 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 }
 func getCode() {
 	var braces_num int = 1
-	var value interface{}
+	//var value interface{}
 	for {
 		input, _, c := inputReader.ReadLine()
 		if c == io.EOF {
@@ -609,7 +654,7 @@ func getCode() {
 			fmt.Println("missing '}' error.")
 			os.Exit(1)
 		}
-		fmt.Println(len(input), string(input), "get")
+		//fmt.Println(len(input), string(input), "get")
 
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
@@ -620,7 +665,7 @@ func getCode() {
 				braces_num--
 				if strings.Contains(string(input), "else") && braces_num == 0 {
 					set_line([]rune(strings.TrimSpace(string(input)))[1:])
-					fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					//fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
 					stl_bak = 1
 					break
 				}
@@ -630,8 +675,44 @@ func getCode() {
 				break
 			}
 			set_line([]rune(line))
-			value = parse_line()
-			fmt.Println(">>", reflect.ValueOf(value))
+			//value =
+			parse_line()
+			//fmt.Println(">>", reflect.ValueOf(value))
+		}
+	}
+}
+
+func getCodeInBody(forToken *ForToken) {
+	var braces_num int = 1
+	//var value interface{}
+	for {
+
+		input := forToken.Body[bodyLine]
+		bodyLine++
+		//fmt.Println(len(input), string(input), "get")
+
+		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
+			continue
+		} else {
+			line := string(input)
+			//fmt.Println("get", line)
+			if strings.Contains(string(input), "}") {
+				braces_num--
+				if strings.Contains(string(input), "else") && braces_num == 0 {
+					set_line([]rune(strings.TrimSpace(string(input)))[1:])
+					//fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					stl_bak = 1
+					break
+				}
+			}
+
+			if braces_num == 0 || strings.Replace(string(input), " ", "", -1) == "}" {
+				break
+			}
+			set_line([]rune(line))
+			//value =
+			parse_line()
+			//fmt.Println(">>", reflect.ValueOf(value))
 		}
 	}
 }
@@ -646,19 +727,17 @@ func skipCode() {
 			fmt.Println("missing '}' error.")
 			os.Exit(1)
 		}
-		//fmt.Println(len(input), string(input), "kkk")
-
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
 
-			line := string(input) + "\n"
-			fmt.Println("sk", line)
+			//line := string(input) + "\n"
+			//fmt.Println("sk", line)
 			if strings.Contains(string(input), "}") {
 				braces_num--
 				if strings.Contains(string(input), "else") && braces_num == 0 {
 					set_line([]rune(strings.TrimSpace(string(input)))[1:])
-					fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					//fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
 					stl_bak = 1
 					break
 				}
@@ -673,22 +752,115 @@ func skipCode() {
 	}
 }
 
-func excutes() {
-	var value interface{}
+func skipCodeInBody(forToken *ForToken) {
+	var braces_num int = 1
+	//var value interface{}
+	for {
+		fmt.Println(bodyLine)
+		input := forToken.Body[bodyLine]
+		bodyLine++
+		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
+			continue
+		} else {
 
-	paramList = make(map[string]Token) //变量列表
-	// for {
-	// 	inputReader := bufio.NewReader(os.Stdin)
-	// 	fmt.Println("please input:")
-	// 	input, err := inputReader.ReadString('\n')
-	// 	if err != nil {
-	// 		fmt.Println("There ware errors reading,exiting program.")
-	// 		return
-	// 	}
-	// 	set_line([]rune(input))
-	// 	value = parse_line()
-	// 	fmt.Println(">>", reflect.ValueOf(value))
-	// }
+			//line := string(input) + "\n"
+			//fmt.Println("sk", line)
+			if strings.Contains(string(input), "}") {
+				braces_num--
+				if strings.Contains(string(input), "else") && braces_num == 0 {
+					set_line([]rune(strings.TrimSpace(string(input)))[1:])
+					//fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					stl_bak = 1
+					break
+				}
+			}
+			if strings.Contains(string(input), "{") {
+				braces_num++
+			}
+			if braces_num == 0 {
+				break
+			}
+		}
+	}
+}
+
+//获取for条件语句
+func getCondition() [3][]rune {
+	var conditions [3][]rune
+	str_line := string(st_line)
+	for_condition_line := string(st_line[strings.Index(str_line, "(")+1 : strings.LastIndex(str_line, ")")])
+	condition := strings.Split(for_condition_line, ";")
+	for i, v := range condition {
+		//condition
+		conditions[i] = []rune(v + "\n")
+		//fmt.Println("for ", v, i)
+	}
+	return conditions
+}
+
+//获取{...}
+func getBodyCode() [][]rune {
+	var braces_num int = 1
+	var forBody [][]rune
+	for {
+		input, _, c := inputReader.ReadLine()
+		if c == io.EOF {
+			fmt.Println("missing '}' error.")
+			os.Exit(1)
+		}
+		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
+			continue
+		} else {
+			line := string(input) + "\n"
+			//fmt.Println("sk", line)
+			if strings.Contains(string(input), "}") {
+				braces_num--
+			}
+			if strings.Contains(string(input), "{") {
+				braces_num++
+			}
+			if braces_num == 0 {
+				break
+			}
+			forBody = append(forBody, []rune(line))
+		}
+	}
+	//fmt.Println(forBody[0][0])
+	return forBody
+}
+
+func runFor(forToken *ForToken) {
+	fmt.Println("condition1", string(forToken.Condition1))
+	set_line(forToken.Condition1)
+	parse_line()
+	for {
+		inBody = 1
+		set_line(forToken.Condition2)
+		value := parse_line()
+		fmt.Println("condition2", string(forToken.Condition2))
+		if value.(bool) {
+			for {
+				v := forToken.Body[bodyLine]
+				bodyLine++
+				set_line(v)
+				parse_line()
+				//fmt.Println("for ", v)
+			}
+			set_line(forToken.Condition3)
+			value3 := parse_line()
+			fmt.Println("condition3", string(forToken.Condition3), value3)
+		} else {
+			break
+		}
+	}
+	inBody = 1
+}
+
+func excutes() {
+	//var value interface{}
+
+	paramList = make(map[string]Token)   //变量列表
+	dbParamList = make(map[string]Token) //数据库变量列表
 
 	for {
 		//fmt.Println("please input:")
@@ -701,17 +873,26 @@ func excutes() {
 				continue
 			} else {
 				line := string(input) + "\n"
-				fmt.Println(line)
+				//fmt.Println(line)
 				set_line([]rune(line))
-				value = parse_line()
-				fmt.Println(">>", reflect.ValueOf(value))
+				//value =
+				parse_line()
+				//fmt.Println(">>", reflect.ValueOf(value))
 			}
 		} else {
 			stl_bak = 0
-			value = parse_line()
-			fmt.Println(">>", reflect.ValueOf(value))
+			//value =
+			parse_line()
+			//fmt.Println(">>", reflect.ValueOf(value))
 		}
 
+	}
+	for k, v := range dbParamList {
+		fmt.Println(k, " : ", v.Value)
+		TokenAsBytes, _ := json.Marshal(v)
+		//fmt.Println(string(TokenAsBytes), v)
+		db.(store.Store).Set([]byte(string(k)), TokenAsBytes)
+		//db.Set([]byte(k), TokenAsBytes)
 	}
 }
 
@@ -724,9 +905,10 @@ func parse_line() interface{} {
 }
 
 func main() {
+	db, _ = store.NewDb("simple.db")
 	var err error
 	//fi, err = os.Open("D:\\work\\TongJi\\go_work\\src\\src\\github.com\\fate\\mycalc2\\test.fate")
-	fi, err = os.Open("D:\\0_chenyao\\git\\src\\fate\\mycalc2\\test.fate")
+	fi, err = os.Open("D:\\0_chenyao\\git\\src\\github.com\\tjfoc\\tjfoc\\simple\\test.fate")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
@@ -734,4 +916,14 @@ func main() {
 	defer fi.Close()
 	inputReader = bufio.NewReader(fi)
 	excutes()
+
+	ToeknBytes, _ := db.(store.Store).Get([]byte("a"))
+	t := Token{}
+	json.Unmarshal(ToeknBytes, &t)
+	fmt.Println("a : ", t.Value)
+
+	ToeknBytes2, _ := db.(store.Store).Get([]byte("b"))
+	t2 := Token{}
+	json.Unmarshal(ToeknBytes2, &t2)
+	fmt.Println("b : ", t2.Value)
 }
