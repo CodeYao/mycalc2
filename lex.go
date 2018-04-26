@@ -30,8 +30,8 @@ func getToken(token *Token) {
 	var status LexerStatus = INITIAL_STATUS
 	var current_char rune
 	var next_char rune
-	token.str = ""
-	token.kind = BAD_TOKEN
+	token.Str = ""
+	token.Kind = BAD_TOKEN
 	for {
 		// if st_line[st_line_pos] == '\000' {
 		// 	break
@@ -39,10 +39,10 @@ func getToken(token *Token) {
 		current_char = st_line[st_line_pos]
 		//fmt.Println("current_char---(", string(current_char), ")")
 		if (status == IN_INT_PART_STATUS || status == IN_FRAC_PART_STATUS) && !unicode.IsDigit(current_char) && current_char != '.' {
-			token.kind = NUMBER_TOKEN
+			token.Kind = NUMBER_TOKEN
 
-			value, _ := strconv.ParseFloat(token.str, 64)
-			token.value = float64(value)
+			value, _ := strconv.ParseFloat(token.Str, 64)
+			token.Value = float64(value)
 			//token.tokenType = FLOAT64
 
 			//fmt.Println("current_char---(", token.str, ")")
@@ -51,20 +51,22 @@ func getToken(token *Token) {
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
 			//fmt.Println("current_str---(", token.str, ")")
-			if IsKeyWord(token.str) {
-				token.kind = TOKEN_TYPE_TOKEN
-			} else if IsStatement(token.str) {
-				token.kind = STATE_TYPE_TOKEN
-			} else if IsBool(token.str) {
-				token.kind = BOOL_TOKEN
-			} else if IsFlowType(token.str) {
-				if token.str == "if" {
-					token.kind = IF_TOKEN
-				} else if token.str == "else" {
-					token.kind = ELSE_TOKEN
+			if IsKeyWord(token.Str) {
+				token.Kind = TOKEN_TYPE_TOKEN
+			} else if IsStatement(token.Str) {
+				token.Kind = STATE_TYPE_TOKEN
+			} else if IsBool(token.Str) {
+				token.Kind = BOOL_TOKEN
+			} else if IsFlowType(token.Str) {
+				if token.Str == "if" {
+					token.Kind = IF_TOKEN
+				} else if token.Str == "else" {
+					token.Kind = ELSE_TOKEN
+				} else if token.Str == "for" {
+					token.Kind = FOR_TOKEN
 				}
 			} else {
-				token.kind = STATE_TOKEN
+				token.Kind = STATE_TOKEN
 			}
 			return
 		}
@@ -72,7 +74,7 @@ func getToken(token *Token) {
 		if unicode.IsSpace(current_char) {
 			//fmt.Println("current_char-------(", string(current_char), ")")
 			if current_char == '\n' {
-				token.kind = END_OF_LINE_TOKEN
+				token.Kind = END_OF_LINE_TOKEN
 				return
 			}
 			if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
@@ -85,90 +87,90 @@ func getToken(token *Token) {
 			os.Exit(1)
 		}
 
-		token.str += string(st_line[st_line_pos])
+		token.Str += string(st_line[st_line_pos])
 		st_line_pos++
 		out_pos++
 		if status != CHAR_PART_STATUS && status != STRING_PART_STATUS {
 			if current_char == '+' {
-				token.kind = ADD_OPERATOR_TOKEN
+				token.Kind = ADD_OPERATOR_TOKEN
 				return
 			} else if current_char == '-' {
-				token.kind = SUB_OPERATOR_TOKEN
+				token.Kind = SUB_OPERATOR_TOKEN
 				return
 			} else if current_char == '*' {
-				token.kind = MUL_OPERATOR_TOKEN
+				token.Kind = MUL_OPERATOR_TOKEN
 				return
 			} else if current_char == '/' {
-				token.kind = DIV_OPERATOR_TOKEN
+				token.Kind = DIV_OPERATOR_TOKEN
 				return
 			} else if current_char == '=' {
 				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
-					token.kind = EQ_TOKEN
+					token.Kind = EQ_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = "=="
+					token.Str = "=="
 					return
 				}
-				token.kind = ASS_OPERATOR_TOKEN
+				token.Kind = ASS_OPERATOR_TOKEN
 				return
 			} else if current_char == '>' {
 				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
-					token.kind = GE_TOKEN
+					token.Kind = GE_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = ">="
+					token.Str = ">="
 					return
 				}
-				token.kind = GT_TOKEN
+				token.Kind = GT_TOKEN
 				return
 			} else if current_char == '<' {
 				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
-					token.kind = LE_TOKEN
+					token.Kind = LE_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = ">="
+					token.Str = ">="
 					return
 				}
-				token.kind = LT_TOKEN
+				token.Kind = LT_TOKEN
 				return
 			} else if current_char == '!' {
 				next_char = st_line[st_line_pos]
 				if next_char == '=' { //判断下一个标识
-					token.kind = NE_TOKEN
+					token.Kind = NE_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = "!="
+					token.Str = "!="
 					return
 				}
-				token.kind = BAD_TOKEN
+				token.Kind = BAD_TOKEN
 				return
 			} else if current_char == '|' {
 				next_char = st_line[st_line_pos]
 				if next_char == '|' { //判断下一个标识
-					token.kind = LOGICAL_OR_TOKEN
+					token.Kind = LOGICAL_OR_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = "||"
+					token.Str = "||"
 					return
 				}
-				token.kind = BAD_TOKEN
+				token.Kind = BAD_TOKEN
 				return
 			} else if current_char == '&' {
 				next_char = st_line[st_line_pos]
 				if next_char == '&' { //判断下一个标识
-					token.kind = LOGICAL_AND_TOKEN
+					token.Kind = LOGICAL_AND_TOKEN
 					st_line_pos++
 					out_pos++
-					token.str = "&&"
+					token.Str = "&&"
 					return
 				}
-				token.kind = BAD_TOKEN
+				token.Kind = BAD_TOKEN
 				return
 			} else if current_char == '%' {
-				token.kind = MOD_OPERATOR_TOKEN
+				token.Kind = MOD_OPERATOR_TOKEN
 				return
 			} else if unicode.IsDigit(current_char) {
 				if status == INITIAL_STATUS {
@@ -186,10 +188,10 @@ func getToken(token *Token) {
 					os.Exit(1)
 				}
 			} else if current_char == '\'' {
-				token.kind = CHAR_SIGN_TOKEN
+				token.Kind = CHAR_SIGN_TOKEN
 				status = CHAR_PART_STATUS
 			} else if current_char == '"' {
-				token.kind = STRING_SIGN_TOKEN
+				token.Kind = STRING_SIGN_TOKEN
 				status = STRING_PART_STATUS
 			} else if unicode.IsLetter(current_char) {
 				if status == INITIAL_STATUS {
@@ -203,16 +205,16 @@ func getToken(token *Token) {
 					os.Exit(1)
 				}
 			} else if current_char == '(' {
-				token.kind = LEFT_PAREN_TOKEN
+				token.Kind = LEFT_PAREN_TOKEN
 				return
 			} else if current_char == ')' {
-				token.kind = RIGHT_PAREN_TOKEN
+				token.Kind = RIGHT_PAREN_TOKEN
 				return
 			} else if current_char == '{' {
-				token.kind = LEFT_BRACES_TOKEN
+				token.Kind = LEFT_BRACES_TOKEN
 				return
 			} else if current_char == '}' {
-				token.kind = RIGHT_BRACES_TOKEN
+				token.Kind = RIGHT_BRACES_TOKEN
 				return
 			} else {
 				fmt.Println("bad character(", current_char, ")")
@@ -220,10 +222,10 @@ func getToken(token *Token) {
 			}
 		} else if status == CHAR_PART_STATUS || status == STRING_PART_STATUS {
 			if current_char == '\'' {
-				token.kind = CHAR_TOKEN
+				token.Kind = CHAR_TOKEN
 				return
 			} else if current_char == '"' {
-				token.kind = STRING_TOKEN
+				token.Kind = STRING_TOKEN
 				return
 			}
 			//fmt.Println("----current_char---(", token.str, ")")

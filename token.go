@@ -20,6 +20,7 @@ const (
 	BOOL_TOKEN                          //布尔标识符
 	IF_TOKEN                            //if标识符
 	ELSE_TOKEN                          //else标识符
+	FOR_TOKEN                           //for标识符
 	PARAM_TOKEN                         //变量标识符
 	STATE_TOKEN                         //声明变量标识符
 	STATE_TYPE_TOKEN                    //声明类型标识符let,set
@@ -76,12 +77,19 @@ const (
 
 var KeyWords = []string{"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "bool", "float32", "float64", "string", "char"}
 var FlowWords = []string{"if", "else", "else if", "for"}
-var StatementWords = []string{"let", "set"}
+var StatementWords = []string{"let", "set"} //set写入数据库,let不写
 
 type Token struct {
-	kind      TokenKind
-	value     interface{} //float32
-	str       string
-	tokenType TokenType
-	stateType StateType
+	Kind      TokenKind   `json:"kind"`
+	Value     interface{} `json:"value"`
+	Str       string      `json:"str"`
+	TokenType TokenType   `json:"tokenType"`
+	StateType StateType   `json:"stateType"`
+}
+
+type ForToken struct {
+	Condition1 []rune   `json:"condition1"`
+	Condition2 []rune   `json:"condition2"`
+	Condition3 []rune   `json:"condition3"`
+	Body       [][]rune `json:"condition"`
 }
