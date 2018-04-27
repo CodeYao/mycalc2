@@ -45,12 +45,12 @@ func getToken(token *Token) {
 			token.Value = float64(value)
 			//token.tokenType = FLOAT64
 
-			//fmt.Println("current_char---(", token.str, ")")
+			//fmt.Println("current_char---(", token.Str, ")")
 			return
 		}
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
-			//fmt.Println("current_str---(", token.str, ")")
+			//fmt.Println("current_str---(", token.Str, ")")
 			if IsKeyWord(token.Str) {
 				token.Kind = TOKEN_TYPE_TOKEN
 			} else if IsStatement(token.Str) {
