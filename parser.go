@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/tjfoc/tjfoc/core/store"
@@ -27,8 +28,13 @@ var else_type int = 0
 
 //var if_st_lines [][]rune
 
-var paramList map[string]Token   //变量列表
+var paramList map[string]Token               //变量列表(全局)
+var arrayParamList map[string]ArrayListToken //数组列表(全局)
+
 var dbParamList map[string]Token //数据库变量列表
+
+var lvNum int = 0                           //局部变量层数
+var localParamList map[int]map[string]Token //局部变量列表
 
 var forNum int = 0 //for嵌套层数
 var forTokenList map[int]ForToken
@@ -51,7 +57,6 @@ func unget_token(token *Token) {
 }
 
 func parse_primary_expression() interface{} {
-	//var fortoken ForToken
 	var token Token
 	var value interface{}
 	var minus_flages int = 0
@@ -65,6 +70,7 @@ func parse_primary_expression() interface{} {
 	}
 
 	my_get_token(&token)
+	fmt.Println(token.Str)
 
 	//判断是否声明变量
 	if token.Kind == STATE_TYPE_TOKEN {
@@ -93,21 +99,29 @@ func parse_primary_expression() interface{} {
 				if token.Kind == ASS_OPERATOR_TOKEN {
 					value = parse_expression()
 					value = getValue(stk.TokenType, value, minus_flages)
-					//fmt.Printfln("---", reflect.TypeOf(value).String())
-					//fmt.Println("b : ", reflect.TypeOf(value).String())
-					// tokentype := getTokenType(reflect.TypeOf(value).String())
-					// if stk.tokenType != tokentype {
-					// 	fmt.Println("The type of variable assignment is not consistent : ", token.str)
-					// 	os.Exit(1)
-					// }
-					if _, ok := paramList[stk.Str]; ok {
-						fmt.Println("error the variable is existed : ", stk.Str)
-						os.Exit(1)
-					} else {
+					if lvNum > 0 {
+						//局部变量还未写入数据库
+						localParam, _ := localParamList[lvNum]
 						stk.Value = value
-						paramList[stk.Str] = stk
+						localParam[stk.Str] = stk
+						localParamList[lvNum] = localParam
 						if stk.StateType == SET {
-							dbParamList[stk.Str] = stk
+							key := strconv.Itoa(lvNum) + "_" + stk.Str
+							dbParamList[key] = stk
+						}
+					} else {
+						if _, ok := arrayParamList[stk.Str]; ok {
+							fmt.Println("error the variable is existed : ", stk.Str)
+							os.Exit(1)
+						} else if _, ok := paramList[stk.Str]; ok {
+							fmt.Println("error the variable is existed : ", stk.Str)
+							os.Exit(1)
+						} else {
+							stk.Value = value
+							paramList[stk.Str] = stk
+							if stk.StateType == SET {
+								dbParamList[stk.Str] = stk
+							}
 						}
 					}
 				} else {
@@ -115,48 +129,329 @@ func parse_primary_expression() interface{} {
 					paramList[stk.Str] = stk
 					return value
 				}
+			} else if token.Kind == LEFT_BRACKET_TOKEN { //变量后续是否为数组标签[
+				var arr ArrayListToken
+				value = parse_expression()
+				boundary := []int{int(value.(float64))}
+				arr.Str = stk.Str
+				arr.Dimension = 1
+				if _, ok := paramList[stk.Str]; ok {
+					fmt.Println("error the variable is existed : ", stk.Str)
+					os.Exit(1)
+				} else if _, ok := arrayParamList[stk.Str]; ok {
+					fmt.Println("error the variable is existed : ", stk.Str)
+					os.Exit(1)
+				}
+				for {
+					my_get_token(&token)
+					if token.Kind != RIGHT_BRACKET_TOKEN {
+						fmt.Println("error Miss ] ")
+						os.Exit(1)
+					}
+					my_get_token(&token)
+					if token.Kind == LEFT_BRACKET_TOKEN {
+						value = parse_expression()
+						boundary = append(boundary, int(value.(float64)))
+						arr.Dimension = arr.Dimension + 1
+					} else {
+						if token.Kind == TOKEN_TYPE_TOKEN {
+							stk.TokenType = getTokenType(token.Str)
+							if stk.TokenType == ERRORTYPE {
+								fmt.Println("error type : ", token.Str)
+								os.Exit(1)
+							}
+						} else {
+							unget_token(&token)
+							fmt.Println("error Miss Type ")
+						}
+						break
+					}
+				}
+				arr.Boundary = boundary
+				arr.TokenType = stk.TokenType
+				arr.StateType = stk.StateType
+
+				my_get_token(&token)
+				//数组后续是否为赋值操作
+				if token.Kind == ASS_OPERATOR_TOKEN {
+					arrValue := []rune(st_line[st_line_pos+1 : len(st_line)-1])
+					fmt.Println("------", string(arrValue), st_line_pos, "------")
+					var spliStr string = "" //数组分割字符
+					for i, v := range arrValue {
+						if v != '{' {
+							fmt.Println("------", i, "------")
+							if i != arr.Dimension {
+								fmt.Println("error Dimension error!")
+								os.Exit(1)
+							}
+							for ; i > 1; i-- {
+								spliStr = spliStr + "}"
+							}
+							spliStr = spliStr + ","
+							break
+						}
+					}
+					fmt.Println("------", spliStr, "------")
+					strs := strings.Split(string(arrValue), spliStr)
+					fmt.Println("------", strs, len(strs), "------")
+					if len(strs) == arr.Boundary[0] {
+						for i := 1; ; i++ {
+							if spliStr == "," {
+								break
+							}
+							spliStr = string([]rune(spliStr)[1:])
+							fmt.Println("------", spliStr, "------")
+							strs = strings.Split(strs[0], spliStr)
+							fmt.Println("------", strs, len(strs), "------")
+							if len(strs) != arr.Boundary[i] {
+								fmt.Println("error Boundary error!")
+								os.Exit(1)
+							}
+						}
+					}
+					valueStr := strings.Replace(string(arrValue), "{", "", -1)
+					valueStr = strings.Replace(valueStr, "}", "", -1)
+					for _, v := range strings.Split(valueStr, ",") {
+						if arr.TokenType >= INT8 && arr.TokenType <= FLOAT64 {
+							val, _ := strconv.ParseFloat(v, 64)
+							value = float64(val)
+							value = getValue(arr.TokenType, value, 0)
+						} else if arr.TokenType == BOOL {
+							if v == "true" {
+								value = true
+							} else if v == "false" {
+								value = false
+							}
+						} else if arr.TokenType == STRING || arr.TokenType == CHAR {
+							value = string([]rune(v)[1 : len(v)-1])
+							value = getValue(arr.TokenType, value, 0)
+						}
+						arr.Value = append(arr.Value, value)
+					}
+
+					fmt.Println("------", valueStr, arr, st_line_pos, "------")
+				} else {
+					unget_token(&token)
+					var num int = 1
+					for _, v := range arr.Boundary {
+						num = num * v
+					}
+					for index := 0; index < num; index++ {
+						if arr.TokenType >= INT8 && arr.TokenType <= FLOAT64 {
+							value = float64(0)
+							value = getValue(arr.TokenType, value, 0)
+						} else if arr.TokenType == BOOL {
+							value = false
+						} else if arr.TokenType == STRING || arr.TokenType == CHAR {
+							value = ""
+							value = getValue(arr.TokenType, value, 0)
+						}
+						arr.Value = append(arr.Value, value)
+					}
+				}
+				fmt.Println("------", arr, st_line_pos, "------")
+				arrayParamList[arr.Str] = arr
 			}
 		}
 	}
 
 	/*获取变量，返回value*/
 	if token.Kind == STATE_TOKEN {
+		var tk Token
+		var arr ArrayListToken
+		var isArr int = 0
+		num := lvNum
 		//判断是否已经声明
-		if tk, ok := paramList[token.Str]; ok {
-			my_get_token(&token)
-			//变量后续是否为赋值操作
-			if token.Kind == ASS_OPERATOR_TOKEN {
+		for {
+			if num == 0 {
+				if ltk, ok := paramList[token.Str]; ok {
+					tk = ltk
+					break
+				} else if ltk, ok := arrayParamList[token.Str]; ok {
+					arr = ltk
+					isArr = 1
+					break
+				} else {
+					fmt.Println("an undeclared variable : ", token.Str)
+					os.Exit(1)
+				}
+				break
+			}
+			localParam, _ := localParamList[num]
+			if ltk, ok := localParam[token.Str]; ok {
+				tk = ltk
+				break
+			}
+			num = num - 1
+		}
+
+		my_get_token(&token)
+		//变量后续是否为赋值操作
+		if token.Kind == ASS_OPERATOR_TOKEN {
+			if isArr == 0 {
 				value = parse_expression()
 				//value = getValue(tk.tokenType, value, minus_flages)
 				tk.Value = getValue(tk.TokenType, value, minus_flages)
-				paramList[tk.Str] = tk
-				if tk.StateType == SET {
-					dbParamList[tk.Str] = tk
-				}
-				//fmt.Println(tk.str, " :: ", tk.value)
-			} else {
-				unget_token(&token)
-				if t, ok := paramList[tk.Str]; ok {
-					//fmt.Println(t.str, " : ", t.value)
-					//遗留问题
-					// if minus_flages == 1 {
-					// 	return getValue(t.tokenType, value, minus_flages)
-					// }
-					value = t.Value
+				if num == 0 {
+					paramList[tk.Str] = tk
+					if tk.StateType == SET {
+						dbParamList[tk.Str] = tk
+					}
 				} else {
-					fmt.Println("Undeclared variables : ", tk.Str)
+					localParam, _ := localParamList[num]
+					//局部变量暂时没有写入数据库
+					localParam[token.Str] = tk
+					localParamList[num] = localParam
+					if tk.StateType == SET {
+						key := strconv.Itoa(lvNum) + "_" + tk.Str
+						dbParamList[key] = tk
+					}
+				}
+			} else if isArr == 1 {
+				arrValue := []rune(st_line[st_line_pos+1 : len(st_line)-1])
+				fmt.Println("------", string(arrValue), st_line_pos, "------")
+				var spliStr string = "" //数组分割字符
+				for i, v := range arrValue {
+					if v != '{' {
+						if i != arr.Dimension {
+							fmt.Println("error Dimension error!")
+							os.Exit(1)
+						}
+						for ; i > 1; i-- {
+							spliStr = spliStr + "}"
+						}
+						spliStr = spliStr + ","
+						break
+					}
+				}
+				strs := strings.Split(string(arrValue), spliStr)
+				if len(strs) == arr.Boundary[0] {
+					for i := 1; ; i++ {
+						if spliStr == "," {
+							break
+						}
+						spliStr = string([]rune(spliStr)[1:])
+						strs = strings.Split(strs[0], spliStr)
+						if len(strs) != arr.Boundary[i] {
+							fmt.Println("error Boundary error!")
+							os.Exit(1)
+						}
+					}
+				}
+				valueStr := strings.Replace(string(arrValue), "{", "", -1)
+				valueStr = strings.Replace(valueStr, "}", "", -1)
+				for i, v := range strings.Split(valueStr, ",") {
+					if arr.TokenType >= INT8 && arr.TokenType <= FLOAT64 {
+						val, _ := strconv.ParseFloat(v, 64)
+						value = float64(val)
+						value = getValue(arr.TokenType, value, 0)
+					} else if arr.TokenType == BOOL {
+						if v == "true" {
+							value = true
+						} else if v == "false" {
+							value = false
+						}
+					} else if arr.TokenType == STRING || arr.TokenType == CHAR {
+						value = string([]rune(v)[1 : len(v)-1])
+						value = getValue(arr.TokenType, value, 0)
+					}
+					arr.Value[i] = value
+				}
+
+				fmt.Println("------", valueStr, arr, st_line_pos, "------")
+			}
+		} else if token.Kind == LEFT_BRACKET_TOKEN {
+			value = parse_expression()
+			boundary := []int{int(value.(float64))}
+			for {
+				my_get_token(&token)
+				if token.Kind != RIGHT_BRACKET_TOKEN {
+					fmt.Println("error Miss ] ")
+					os.Exit(1)
+				}
+				my_get_token(&token)
+				if token.Kind == LEFT_BRACKET_TOKEN {
+					value = parse_expression()
+					boundary = append(boundary, int(value.(float64)))
+				} else {
+					unget_token(&token)
+					break
+				}
+			}
+			if token.Kind == ASS_OPERATOR_TOKEN {
+				my_get_token(&token)
+				value = parse_expression()
+
+				var stlen int = 0
+				var cup int = 1
+				for i, v1 := range boundary {
+					cup = v1
+					for j := i + 1; j < arr.Dimension; j++ {
+						cup = cup * arr.Boundary[j]
+					}
+					stlen = stlen + cup
+				}
+				fmt.Println("arr num : ", stlen)
+				if len(boundary) == arr.Dimension {
+					arr.Value[stlen] = value
+				} else if len(boundary) < arr.Dimension {
+					valueLen := 1
+					for i := arr.Dimension - len(boundary); i > 0; i-- {
+						valueLen = valueLen * arr.Boundary[arr.Dimension-i]
+					}
+					//fmt.Println("*********************", value, "*************************")
+					j := 0
+					for i := stlen; i < (stlen + valueLen - 1); i++ {
+						//fmt.Println("*********************", i, j, "*************************")
+						arr.Value[i] = value.([]interface{})[j]
+						j++
+					}
+					//fmt.Println("*********************", value, "*************************")
+				} else if len(boundary) > arr.Dimension {
+					fmt.Println("error to many []")
+					os.Exit(1)
+				}
+			} else {
+				//arrlen := len(arr.Value)
+				var stlen int = 0
+				var cup int = 1
+				for i, v1 := range boundary {
+					cup = v1
+					for j := i + 1; j < arr.Dimension; j++ {
+						cup = cup * arr.Boundary[j]
+					}
+					stlen = stlen + cup
+				}
+				fmt.Println("arr num : ", stlen)
+				if len(boundary) == arr.Dimension {
+					value = arr.Value[stlen]
+				} else if len(boundary) < arr.Dimension {
+					valueLen := 1
+					for i := arr.Dimension - len(boundary); i > 0; i-- {
+						valueLen = valueLen * arr.Boundary[arr.Dimension-i]
+					}
+					fmt.Println("*********************", valueLen, "*************************")
+					value = arr.Value[stlen : stlen+valueLen-1]
+					fmt.Println("*********************", value, "*************************")
+				} else if len(boundary) > arr.Dimension {
+					fmt.Println("error to many []")
 					os.Exit(1)
 				}
 			}
 		} else {
-			fmt.Println("an undeclared variable : ", token.Str)
-			os.Exit(1)
+			unget_token(&token)
+			value = tk.Value
+			fmt.Println("tk.Value : ", tk.Value)
 		}
+
 	}
 	//如果是else
 	if token.Kind == ELSE_TOKEN {
 		value = true
 		if else_type == 2 && if_type == 3 {
+			lvNum = lvNum + 1
+			localParam := make(map[string]Token)
+			localParamList[lvNum] = localParam
 			my_get_token(&token)
 			if token.Kind == LEFT_BRACES_TOKEN {
 				if inBody == 1 {
@@ -167,9 +462,10 @@ func parse_primary_expression() interface{} {
 				else_type = 0
 				if_type = 0
 			} else if token.Kind == IF_TOKEN {
-				//unget_token(&token)
 				else_type = 0
 			}
+			delete(localParamList, lvNum)
+			lvNum = lvNum - 1
 		} else if else_type == 2 && if_type == 0 {
 			fmt.Println("Miss if error")
 			os.Exit(1)
@@ -194,6 +490,9 @@ func parse_primary_expression() interface{} {
 				os.Exit(1)
 			}
 			if value.(bool) {
+				lvNum = lvNum + 1
+				localParam := make(map[string]Token)
+				localParamList[lvNum] = localParam
 				//fmt.Println("if true")
 				if_type = 2
 				my_get_token(&token)
@@ -205,6 +504,8 @@ func parse_primary_expression() interface{} {
 					}
 				}
 				if_type = 0
+				delete(localParamList, lvNum)
+				lvNum = lvNum - 1
 			} else {
 				if_type = 3
 				else_type = 2
@@ -222,6 +523,7 @@ func parse_primary_expression() interface{} {
 	}
 	//如果是for
 	if token.Kind == FOR_TOKEN {
+
 		forNum++
 		var forToken ForToken
 		var bodyCode [][]rune
@@ -243,6 +545,7 @@ func parse_primary_expression() interface{} {
 		forToken.Body = bodyCode
 		forTokenList[forNum] = forToken
 		runFor(&forToken, forNum)
+
 	}
 	//如果是常量
 	if token.Kind == NUMBER_TOKEN {
@@ -285,9 +588,7 @@ func parse_primary_expression() interface{} {
 			value = -reflect.ValueOf(value).Uint()
 		}
 		value = float64(value.(uint64))
-	} // else {
-	// 	fmt.Println("These Type can not be negative ", reflect.TypeOf(value).String())
-	// }
+	}
 	return value
 }
 
@@ -661,7 +962,6 @@ func getValue(t TokenType, value interface{}, minus_flages int) interface{} {
 }
 func getCode() {
 	var braces_num int = 1
-	//var value interface{}
 	for {
 		input, _, c := inputReader.ReadLine()
 		if c == io.EOF {
@@ -670,7 +970,6 @@ func getCode() {
 			os.Exit(1)
 		}
 		//fmt.Println(len(input), string(input), "get")
-
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
@@ -690,7 +989,6 @@ func getCode() {
 				break
 			}
 			set_line([]rune(line))
-			//value =
 			parse_line()
 			//fmt.Println(">>", reflect.ValueOf(value))
 		}
@@ -699,13 +997,11 @@ func getCode() {
 
 func getCodeInBody(forToken *ForToken) {
 	var braces_num int = 1
-	//var value interface{}
 	for {
 
 		input := forToken.Body[bodyLine]
 		bodyLine++
 		//fmt.Println(len(input), string(input), "get")
-
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
@@ -725,7 +1021,6 @@ func getCodeInBody(forToken *ForToken) {
 				break
 			}
 			set_line([]rune(line))
-			//value =
 			parse_line()
 			//fmt.Println(">>", reflect.ValueOf(value))
 		}
@@ -745,8 +1040,6 @@ func skipCode() {
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
-
-			//line := string(input) + "\n"
 			//fmt.Println("sk", line)
 			if strings.Contains(string(input), "}") {
 				braces_num--
@@ -769,7 +1062,6 @@ func skipCode() {
 
 func skipCodeInBody(forToken *ForToken) {
 	var braces_num int = 1
-	//var value interface{}
 	for {
 		//fmt.Println(bodyLine, string(forToken.Body[bodyLine]))
 		input := forToken.Body[bodyLine]
@@ -777,14 +1069,12 @@ func skipCodeInBody(forToken *ForToken) {
 		if len(input) == 0 || strings.Replace(string(input), " ", "", -1) == "" { //跳过空行
 			continue
 		} else {
-
-			//line := string(input)
 			//fmt.Println("sk", line, braces_num)
 			if strings.Contains(string(input), "}") {
 				braces_num--
 				if strings.Contains(string(input), "else") && braces_num == 0 {
 					set_line([]rune(strings.TrimSpace(string(input)))[1:])
-					//fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
+					fmt.Println("bak", string([]rune(strings.TrimSpace(string(input)))[1:]))
 					stl_bak = 1
 					break
 				}
@@ -872,41 +1162,28 @@ func getBodyCodeInBody(forToken *ForToken) [][]rune {
 }
 
 func runFor(forToken *ForToken, num int) {
+	lvNum = lvNum + 1
+	localParam := make(map[string]Token)
+	localParamList[lvNum] = localParam
 	fmt.Println("condition1", string(forToken.Condition1))
 	set_line(forToken.Condition1)
 	parse_line()
-	//line := bodyLine
 	for {
 		inBody = 1
 		set_line(forToken.Condition2)
 		value := parse_line()
 		fmt.Println("condition2", string(forToken.Condition2))
 		if value.(bool) {
-			// if inBody != 1 {
 			bodyLine = 0
-			// } else {
-			// 	bodyLine = line
-			// }
 			for i := 0; i < len(forToken.Body); i++ {
 				var v []rune
 				fmt.Println("forNum :", forNum, i, "bodyLine", bodyLine, "Body :", string(forToken.Body[i]))
 				if stl_bak == 0 {
-					// if inBody != 1 {
-					// 	if bodyLine >= len(forToken.Body) {
-					// 		break
-					// 	} else {
-					// 		v = forToken.Body[bodyLine]
-					// 	}
-					// } else {
 					if t, ok := forTokenList[num+1]; ok {
 						delete(forTokenList, num+1)
 						i = i + len(t.Body)
 					}
-
 					v = forToken.Body[i]
-
-					//}
-					//v := forToken.Body[i]
 					bodyLine++
 					//fmt.Println("for ----", string(v), strings.Replace(string(v), " ", "", -1))
 					if strings.TrimSpace(string(v)) != "}" {
@@ -915,7 +1192,7 @@ func runFor(forToken *ForToken, num int) {
 					}
 				} else {
 					stl_bak = 0
-					//value =
+					i = bodyLine - 1
 					parse_line()
 					//fmt.Println(">>", reflect.ValueOf(value))
 				}
@@ -932,14 +1209,16 @@ func runFor(forToken *ForToken, num int) {
 	if forNum == 1 {
 		inBody = 0
 	}
+	delete(localParamList, lvNum)
+	lvNum = lvNum - 1
 }
 
 func excutes() {
-	//var value interface{}
-
-	paramList = make(map[string]Token)    //变量列表
-	dbParamList = make(map[string]Token)  //数据库变量列表
-	forTokenList = make(map[int]ForToken) //for列表
+	paramList = make(map[string]Token)               //变量列表
+	arrayParamList = make(map[string]ArrayListToken) //数组变量列表
+	dbParamList = make(map[string]Token)             //数据库变量列表
+	forTokenList = make(map[int]ForToken)            //for列表
+	localParamList = make(map[int]map[string]Token)  //局部变量列表
 
 	for {
 		//fmt.Println("please input:")
@@ -954,13 +1233,11 @@ func excutes() {
 				line := string(input) + "\n"
 				//fmt.Println(line)
 				set_line([]rune(line))
-				//value =
 				parse_line()
 				//fmt.Println(">>", reflect.ValueOf(value))
 			}
 		} else {
 			stl_bak = 0
-			//value =
 			parse_line()
 			//fmt.Println(">>", reflect.ValueOf(value))
 		}
@@ -971,7 +1248,6 @@ func excutes() {
 		TokenAsBytes, _ := json.Marshal(v)
 		//fmt.Println(string(TokenAsBytes), v)
 		db.(store.Store).Set([]byte(string(k)), TokenAsBytes)
-		//db.Set([]byte(k), TokenAsBytes)
 	}
 }
 

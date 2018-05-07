@@ -45,12 +45,12 @@ func getToken(token *Token) {
 			token.Value = float64(value)
 			//token.tokenType = FLOAT64
 
-			//fmt.Println("current_char---(", token.str, ")")
+			//fmt.Println("current_char---(", token.Str, ")")
 			return
 		}
 
 		if (status == FIRST_PARAM_STATUS || status == FOLLOW_PARAM_STATUS) && !unicode.IsDigit(current_char) && current_char != '_' && !unicode.IsLetter(current_char) {
-			//fmt.Println("current_str---(", token.str, ")")
+			//fmt.Println("current_str---(", token.Str, ")")
 			if IsKeyWord(token.Str) {
 				token.Kind = TOKEN_TYPE_TOKEN
 			} else if IsStatement(token.Str) {
@@ -215,6 +215,12 @@ func getToken(token *Token) {
 				return
 			} else if current_char == '}' {
 				token.Kind = RIGHT_BRACES_TOKEN
+				return
+			} else if current_char == '[' {
+				token.Kind = LEFT_BRACKET_TOKEN
+				return
+			} else if current_char == ']' {
+				token.Kind = RIGHT_BRACKET_TOKEN
 				return
 			} else {
 				fmt.Println("bad character(", current_char, ")")
